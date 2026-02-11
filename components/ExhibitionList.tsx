@@ -5,6 +5,7 @@ import { ExhibitionData, SortType } from '../types';
 interface ExhibitionListProps {
   exhibitions: ExhibitionData[];
   onSelect: (exhibition: ExhibitionData) => void;
+  onJoinMeeting: (exhibition: ExhibitionData) => void;
   likedIds: Set<string>;
   onLikeToggle: (id: string) => void;
   currentUserId: string;
@@ -19,6 +20,7 @@ interface ArtZone {
 const ExhibitionList: React.FC<ExhibitionListProps> = ({ 
   exhibitions, 
   onSelect, 
+  onJoinMeeting,
   likedIds, 
   onLikeToggle
 }) => {
@@ -159,13 +161,20 @@ const ExhibitionList: React.FC<ExhibitionListProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <a 
           href={ex.representativeLink} target="_blank" rel="noopener noreferrer" 
-          className="w-full py-4.5 bg-slate-800 text-white rounded-2xl text-[11px] font-black active:opacity-90 transition-all uppercase tracking-widest shadow-lg shadow-slate-100 text-center"
+          className="w-full py-4.5 bg-slate-50 text-slate-400 border border-slate-100 rounded-2xl text-[10px] font-black active:opacity-70 transition-all uppercase tracking-widest text-center flex items-center justify-center"
         >
-          VIEW OFFICIAL INFO
+          INFO
         </a>
+        <button 
+          onClick={(e) => { e.stopPropagation(); onJoinMeeting(ex); }}
+          className="w-full py-4.5 bg-slate-800 text-white rounded-2xl text-[10px] font-black active:scale-[0.98] transition-all uppercase tracking-widest shadow-lg shadow-slate-100 flex items-center justify-center gap-2"
+        >
+          <span>JOIN MEETING</span>
+          <i className="fa-solid fa-arrow-right text-[8px] opacity-50"></i>
+        </button>
       </div>
       
       {isClosingSoon(ex.endDate) && (

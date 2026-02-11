@@ -11,6 +11,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, onViewChange }) => {
   const navItems: { view: ViewType; label: string; icon: string }[] = [
     { view: 'list', label: 'EXHIBIT', icon: 'fa-layer-group' },
     { view: 'mytour', label: 'TOUR', icon: 'fa-draw-polygon' },
+    { view: 'chat-list', label: 'TALK', icon: 'fa-comments' },
     { view: 'profile', label: 'MY', icon: 'fa-user' },
   ];
 
