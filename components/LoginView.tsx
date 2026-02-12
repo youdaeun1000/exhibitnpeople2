@@ -1,47 +1,85 @@
 
-import React, { useState } from 'react';
-import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface LoginViewProps {
-  onVerifyComplete: (userData: { uid: string; email: string; name: string }, isExisting: boolean) => void;
-  // 기존 props는 호환성을 위해 남겨두거나 내부에서 처리
-  suspendedNumbers?: string[];
-  existingPhoneNumbers?: string[];
+  onVerifyComplete: (userData: { phoneNumber: string; name?: string; id?: string }, isExisting: boolean) => void;
 }
 
 export default function LoginView({ onVerifyComplete }: LoginViewProps) {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timer, setTimer] = useState(180); // 3분 타이머
 
-  const handleGoogleLogin = async () => {
+  useEffect(() => {
+    let interval: any;
+    if (step === 'code' && timer > 0) {
+      interval = setInterval(() => setTimer(t => t - 1), 1000);
+    } else if (timer === 0) {
+      setError("인증 시간이 만료되었습니다. 다시 시도해 주세요.");
+    }
+    return () => clearInterval(interval);
+  }, [step, timer]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const digits = phoneNumber.replace(/\D/g, '');
+    if (digits.length < 10) {
+      setError("올바른 휴대폰 번호를 입력해 주세요.");
+      return;
+    }
     setLoading(true);
     setError(null);
+    
+    // 실제 환경에서는 여기서 Firebase signInWithPhoneNumber를 호출합니다.
+    setTimeout(() => {
+      setStep('code');
+      setTimer(180);
+      setLoading(false);
+    }, 1000);
+  };
+
+  const handleCodeVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (verificationCode.length !== 6) {
+      setError("6자리 인증번호를 입력해 주세요.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      if (!user.email) {
-        throw new Error("이메일 정보를 가져올 수 없습니다.");
+      // 1. 기존 유저 확인
+      const formattedPhone = phoneNumber.replace(/\D/g, '');
+      const q = query(collection(db, "Users"), where("phone", "==", `+8210${formattedPhone.substring(3)}`));
+      const querySnapshot = await getDocs(q);
+      
+      const isExisting = !querySnapshot.empty;
+      let existingData = {};
+      
+      if (isExisting) {
+        const userDoc = querySnapshot.docs[0];
+        const data = userDoc.data();
+        existingData = {
+          id: userDoc.id,
+          name: data.nickname || data.name,
+          phoneNumber: phoneNumber
+        };
       }
 
-      // Firestore에서 기존 유저인지 확인
-      const userDoc = await getDoc(doc(db, "Users", user.uid));
-      const isExisting = userDoc.exists();
-
-      onVerifyComplete({
-        uid: user.uid,
-        email: user.email,
-        name: user.displayName || '익명'
-      }, isExisting);
-    } catch (err: any) {
-      console.error("Login Error:", err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError("로그인 창이 닫혔습니다. 다시 시도해 주세요.");
-      } else {
-        setError("로그인 중 오류가 발생했습니다.");
-      }
+      onVerifyComplete({ phoneNumber, ...existingData }, isExisting);
+    } catch (err) {
+      setError("인증 확인 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -50,55 +88,84 @@ export default function LoginView({ onVerifyComplete }: LoginViewProps) {
   return (
     <div className="min-h-screen bg-white flex flex-col p-8 max-w-lg mx-auto animate-in fade-in duration-500">
       <div className="mb-12 mt-16 text-center">
-        <div className="w-24 h-24 bg-white rounded-[2.5rem] flex items-center justify-center mb-6 mx-auto shadow-2xl shadow-teal-50 overflow-hidden border border-slate-50">
-          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-16 h-16">
-            <rect x="8" y="4" width="24" height="32" rx="5" fill="#F1F5F9" />
-            <rect x="10" y="6" width="20" height="28" rx="4" fill="#2DD4BF" />
-            <path d="M16 14H24C24.5523 14 25 14.4477 25 15V20C25 20.5523 24.5523 21 24 21H20.5L18.5 23.5V21H16C15.4477 21 15 20.5523 15 20V15C15 14.4477 15.4477 14 16 14Z" fill="white" />
-            <circle cx="27" cy="30" r="2.5" fill="#FDA4AF" />
-          </svg>
+        <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-6 mx-auto shadow-sm border border-slate-100">
+           <i className="fa-solid fa-mobile-screen-button text-2xl text-slate-800"></i>
         </div>
         
-        <div className="flex flex-col items-center gap-1">
-          <h1 className="text-3xl tracking-[-0.05em] leading-none flex items-center">
-            <span className="font-extrabold text-teal-500">전시</span>
-            <span className="font-bold text-slate-700 ml-1">와 사람들</span>
-          </h1>
-          <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mt-2">
-            Eye & Connection Community
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-2">
+          {step === 'phone' ? '휴대폰 번호 로그인' : '인증번호 입력'}
+        </h1>
+        <p className="text-xs font-bold text-slate-400 leading-relaxed">
+          {step === 'phone' 
+            ? '본인 확인을 위해 휴대폰 번호를 입력해 주세요.' 
+            : `${phoneNumber}번으로 전송된 인증번호를 입력해 주세요.`}
+        </p>
+      </div>
+
+      <div className="flex-1">
+        {step === 'phone' ? (
+          <form onSubmit={handlePhoneSubmit} className="space-y-6">
+            <div className="relative group">
+              <input 
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, '').replace(/^(\d{2,3})(\d{3,4})(\d{4})$/, `$1-$2-$3`))}
+                placeholder="010-0000-0000"
+                className="w-full px-6 py-5 bg-slate-50 border-none rounded-3xl font-black text-lg focus:ring-4 focus:ring-slate-100 outline-none transition-all placeholder:text-slate-200"
+              />
+            </div>
+            <button 
+              type="submit"
+              disabled={loading || phoneNumber.length < 12}
+              className="w-full py-5 bg-slate-800 text-white font-black rounded-[2rem] shadow-xl shadow-slate-100 active:scale-[0.98] transition-all text-sm disabled:bg-slate-100 disabled:text-slate-300 disabled:shadow-none"
+            >
+              {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : '인증문자 받기'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleCodeVerify} className="space-y-6">
+            <div className="relative group">
+              <input 
+                type="number"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.slice(0, 6))}
+                placeholder="6자리 숫자 입력"
+                className="w-full px-6 py-5 bg-slate-50 border-none rounded-3xl font-black text-center text-2xl tracking-[0.5em] focus:ring-4 focus:ring-slate-100 outline-none transition-all placeholder:text-slate-200 placeholder:tracking-normal placeholder:text-sm"
+              />
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-indigo-500">
+                {formatTime(timer)}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                type="button"
+                onClick={() => setStep('phone')}
+                className="flex-1 py-5 bg-slate-50 text-slate-400 font-black rounded-[2rem] active:scale-[0.98] transition-all text-sm"
+              >
+                뒤로
+              </button>
+              <button 
+                type="submit"
+                disabled={loading || verificationCode.length !== 6 || timer === 0}
+                className="flex-[2] py-5 bg-slate-800 text-white font-black rounded-[2rem] shadow-xl shadow-slate-100 active:scale-[0.98] transition-all text-sm disabled:bg-slate-100 disabled:text-slate-300 disabled:shadow-none"
+              >
+                {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : '인증 완료'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {error && (
+          <p className="text-[10px] font-bold text-red-500 text-center mt-6 flex items-center justify-center gap-1 animate-in shake duration-300">
+            <i className="fa-solid fa-circle-exclamation"></i>
+            {error}
           </p>
-        </div>
+        )}
       </div>
 
-      <div className="space-y-6 flex-1 flex flex-col justify-center">
-        <div className="space-y-4">
-          <button 
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full py-5 bg-white border border-slate-100 text-slate-800 font-black rounded-[2rem] shadow-xl shadow-slate-100 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-4 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-            ) : (
-              <>
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                Google로 시작하기
-              </>
-            )}
-          </button>
-          
-          {error && (
-            <p className="text-[10px] font-bold text-red-500 text-center flex items-center justify-center gap-1">
-              <i className="fa-solid fa-circle-exclamation"></i>
-              {error}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="py-8 text-center mt-auto px-6">
-        <p className="text-[10px] font-bold text-slate-300 leading-relaxed">
-          Google 계정으로 간편하게 가입하고<br/>전시 문화를 함께 즐겨보세요.
+      <div className="py-8 text-center mt-auto">
+        <p className="text-[10px] font-bold text-slate-300 leading-relaxed uppercase tracking-widest">
+          Secured by Firebase Auth
         </p>
       </div>
     </div>
