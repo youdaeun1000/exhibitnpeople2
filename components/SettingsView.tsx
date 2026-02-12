@@ -6,13 +6,15 @@ interface SettingsViewProps {
   onNavigateBlocked: () => void;
   onNavigateCustomerService: () => void;
   onWithdrawal: () => void;
+  onLogout: () => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
   onBack, 
   onNavigateBlocked, 
   onNavigateCustomerService,
-  onWithdrawal 
+  onWithdrawal,
+  onLogout
 }) => {
   return (
     <div className="min-h-screen bg-slate-50 animate-in slide-in-from-bottom duration-300">
@@ -59,7 +61,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-active:translate-x-1 transition-transform"></i>
           </button>
 
-          {/* 3. 서비스 탈퇴 신청 */}
+          {/* 3. 로그아웃 */}
+          <button 
+            onClick={onLogout}
+            className="w-full px-8 py-6 flex items-center justify-between active:bg-red-50 transition-colors group text-left"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 group-active:scale-110 transition-transform">
+                <i className="fa-solid fa-right-from-bracket text-sm"></i>
+              </div>
+              <span className="text-sm font-bold text-red-500">로그아웃</span>
+            </div>
+            <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-active:translate-x-1 transition-transform"></i>
+          </button>
+
+          {/* 4. 서비스 탈퇴 신청 */}
           <button 
             onClick={onWithdrawal}
             className="w-full px-8 py-6 flex items-center justify-between active:bg-slate-100 transition-colors group text-left"

@@ -1,6 +1,7 @@
 
-import { db } from './firebase'
+import { db, auth } from './firebase'
 import { doc, setDoc, getDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp, collection, addDoc, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore'
+import { signOut } from 'firebase/auth'
 import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -43,7 +44,7 @@ const App: React.FC = () => {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [selectedExhibitionForMeetings, setSelectedExhibitionForMeetings] = useState<{id: string, title: string} | null>(null);
   
-  const [currentUser, setCurrentUser] = useState({
+  const initialUserState = {
     id: '',
     name: '익명',
     email: '',
@@ -51,7 +52,9 @@ const App: React.FC = () => {
     bio: null as string | null,
     role: 'Viewer' as UserRole,
     lastNicknameChangedAt: 0,
-  });
+  };
+
+  const [currentUser, setCurrentUser] = useState(initialUserState);
 
   const [likedExhibitionIds, setLikedExhibitionIds] = useState<Set<string>>(new Set());
   const [targetUserData, setTargetUserData] = useState<{id: string, name: string, instagramUrl: string | null, bio: string | null, role: UserRole} | null>(null);
@@ -618,6 +621,27 @@ const App: React.FC = () => {
     }
   };
 
+  const handleLogout = async () => {
+    if (!window.confirm("로그아웃 하시겠습니까?")) return;
+    setIsSaving(true);
+    setSavingMessage('로그아웃 중입니다...');
+    try {
+      await signOut(auth);
+      localStorage.removeItem('exhibireg_user');
+      setIsLoggedIn(false);
+      setCurrentUser(initialUserState);
+      setLikedExhibitionIds(new Set());
+      setCurrentView('list');
+      setHistory([]);
+      alert("로그아웃 되었습니다.");
+    } catch (error) {
+      console.error("Logout Error:", error);
+      alert("로그아웃 중 오류가 발생했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title) { alert('전시 제목을 입력해 주세요.'); return; }
@@ -783,7 +807,7 @@ const App: React.FC = () => {
             <div className="flex flex-col items-center justify-center py-40 px-10 text-center"><p className="text-sm font-medium text-slate-400">사용자를 찾을 수 없습니다.</p><button onClick={goBack} className="mt-8 px-10 py-4 bg-slate-800 text-white font-black rounded-[2rem] text-xs">뒤로 가기</button></div>
           )
         ) : currentView === 'settings' ? (
-          <SettingsView onBack={goBack} onNavigateBlocked={() => navigateTo('blocked-management')} onNavigateCustomerService={() => navigateTo('customer-service')} onWithdrawal={() => navigateTo('withdrawal-guide')} />
+          <SettingsView onBack={goBack} onNavigateBlocked={() => navigateTo('blocked-management')} onNavigateCustomerService={() => navigateTo('customer-service')} onWithdrawal={() => navigateTo('withdrawal-guide')} onLogout={handleLogout} />
         ) : currentView === 'blocked-management' ? (
           <BlockedManagementView blockedIds={blockedIds} onBack={goBack} onUnblock={handleBlockToggle} />
         ) : currentView === 'withdrawal-guide' ? ( <WithdrawalGuideView onBack={goBack} />
