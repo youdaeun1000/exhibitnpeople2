@@ -1,4 +1,5 @@
-import { db, formatToFirebasePhone } from './firebase'
+
+import { db } from './firebase'
 import { doc, setDoc, getDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp, collection, addDoc, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore'
 import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
@@ -29,7 +30,7 @@ import { DUMMY_EXHIBITIONS, DUMMY_USERS, DAYS, REGIONS } from './constants';
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [pendingPhone, setPendingPhone] = useState('');
+  const [pendingUser, setPendingUser] = useState<{uid: string, email: string, name: string} | null>(null);
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savingMessage, setSavingMessage] = useState('정보를 처리하고 있습니다...');
@@ -45,7 +46,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState({
     id: '',
     name: '익명',
-    phoneNumber: '',
+    email: '',
     instagramUrl: null as string | null,
     bio: null as string | null,
     role: 'Viewer' as UserRole,
@@ -459,12 +460,13 @@ const App: React.FC = () => {
     });
   };
 
-  const handleVerifyComplete = (userData: {phoneNumber: string; name?: string; id?: string}, isExisting: boolean) => {
+  const handleVerifyComplete = (userData: {uid: string, email: string, name: string}, isExisting: boolean) => {
     if (isExisting) {
+      // 기존 유저는 바로 로그인
       const user = {
-        id: userData.id || `user_${Date.now()}`,
-        name: userData.name || '사용자',
-        phoneNumber: userData.phoneNumber,
+        id: userData.uid,
+        name: userData.name,
+        email: userData.email,
         instagramUrl: null,
         bio: null,
         role: 'Viewer' as UserRole,
@@ -474,22 +476,22 @@ const App: React.FC = () => {
       localStorage.setItem('exhibireg_user', JSON.stringify(user));
       setIsLoggedIn(true);
       setShowLoginOverlay(false);
-      fetchUserFavorites(user.id);
+      fetchUserFavorites(userData.uid);
     } else {
-      setPendingPhone(userData.phoneNumber);
+      // 신규 유저는 프로필 설정으로
+      setPendingUser(userData);
       setIsNewUser(true);
     }
   };
 
-  const handleSignupComplete = async (userData: { name: string; phoneNumber: string }) => {
-    if (isSaving) return;
+  const handleSignupComplete = async (userData: { name: string; email: string }) => {
+    if (isSaving || !pendingUser) return;
     setIsSaving(true);
-    const userId = `user_${Date.now()}`;
-    const formattedPhone = formatToFirebasePhone(userData.phoneNumber);
+    const userId = pendingUser.uid;
     try {
       await setDoc(doc(db, "Users", userId), {
         userId: userId, 
-        phone: formattedPhone, 
+        email: userData.email, 
         nickname: userData.name, 
         favorites: [], 
         instagramUrl: null, 
@@ -500,7 +502,7 @@ const App: React.FC = () => {
       const newUser = { 
         id: userId, 
         name: userData.name, 
-        phoneNumber: userData.phoneNumber, 
+        email: userData.email, 
         instagramUrl: null, 
         bio: null, 
         role: 'Viewer' as UserRole, 
@@ -701,7 +703,7 @@ const App: React.FC = () => {
   };
 
   if (showLoginOverlay) {
-    if (isNewUser) return <SignupView phoneNumber={pendingPhone} onSignupComplete={handleSignupComplete} />;
+    if (isNewUser && pendingUser) return <SignupView email={pendingUser.email} onSignupComplete={handleSignupComplete} />;
     return (
       <div className="fixed inset-0 z-[2000] bg-white max-w-lg mx-auto overflow-y-auto">
         <div className="absolute top-8 left-8 z-[2001]">
@@ -788,25 +790,7 @@ const App: React.FC = () => {
         ) : currentView === 'report-guide' ? ( <ReportGuideView onBack={goBack} />
         ) : currentView === 'customer-service' ? ( <CustomerServiceView onBack={goBack} />
         ) : currentView === 'exhibition-meetings' && selectedExhibitionForMeetings ? (
-          <ExhibitionMeetingsView 
-            exhibitionId={selectedExhibitionForMeetings.id} 
-            exhibitionTitle={selectedExhibitionForMeetings.title} 
-            meetings={meetings} 
-            currentUserId={currentUser.id} 
-            onBack={goBack} 
-            onSelectMeeting={handleMeetingSelect} 
-            /* Fix: firstExId was undefined here. Reference selectedExhibitionForMeetings.id to find the exhibition and its region. */
-            onCreateNew={() => { 
-              setMeetingContext({ 
-                id: selectedExhibitionForMeetings.id, 
-                title: selectedExhibitionForMeetings.title, 
-                type: 'exhibition', 
-                location: exhibitions.find(e => e.id === selectedExhibitionForMeetings.id)?.region || '' 
-              }); 
-              navigateTo('meeting-create'); 
-            }} 
-            onSelectUser={handleUserClick} 
-          />
+          <ExhibitionMeetingsView exhibitionId={selectedExhibitionForMeetings.id} exhibitionTitle={selectedExhibitionForMeetings.title} meetings={meetings} currentUserId={currentUser.id} onBack={goBack} onSelectMeeting={handleMeetingSelect} onCreateNew={() => { setMeetingContext({ id: selectedExhibitionForMeetings.id, title: selectedExhibitionForMeetings.title, type: 'exhibition', location: exhibitions.find(e => e.id === selectedExhibitionForMeetings.id)?.region || '' }); navigateTo('meeting-create'); }} onSelectUser={handleUserClick} />
         ) : currentView === 'meeting-create' && meetingContext ? (
           <MeetingCreate context={meetingContext} onBack={goBack} onCreated={(m) => { fetchMeetings(); setCurrentView('meeting'); setHistory([]); }} currentUserId={currentUser.id} />
         ) : currentView === 'chat-room' && selectedMeetingId ? (

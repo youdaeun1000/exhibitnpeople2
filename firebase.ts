@@ -1,7 +1,7 @@
 
 // Firebase SDK import
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -20,6 +20,7 @@ const app = initializeApp(firebaseConfig);
 
 // 인증 모듈
 export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
 
 /**
  * Firestore 모듈 초기화
@@ -33,12 +34,5 @@ export const db = initializeFirestore(app, {
 export const storage = getStorage(app);
 
 /**
- * 휴대폰 번호 포맷팅: DB 저장용 (+82 형태 등)
+ * [제거됨] formatToFirebasePhone: 휴대폰 인증을 사용하지 않으므로 제거합니다.
  */
-export const formatToFirebasePhone = (phone: string) => {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('010') && digits.length === 11) {
-    return `+8210${digits.substring(3)}`;
-  }
-  return phone;
-};

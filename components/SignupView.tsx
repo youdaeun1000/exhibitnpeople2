@@ -2,11 +2,11 @@
 import React, { useState } from 'react';
 
 interface SignupViewProps {
-  phoneNumber: string;
-  onSignupComplete: (userData: { name: string; phoneNumber: string }) => void;
+  email: string;
+  onSignupComplete: (userData: { name: string; email: string }) => void;
 }
 
-export default function SignupView({ phoneNumber, onSignupComplete }: SignupViewProps) {
+export default function SignupView({ email, onSignupComplete }: SignupViewProps) {
   const [nickname, setNickname] = useState('');
   const [agreed, setAgreed] = useState({
     terms: false,
@@ -38,7 +38,7 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
     if (isProfileValid) {
       onSignupComplete({
         name: nickname.trim(),
-        phoneNumber: phoneNumber,
+        email: email,
       });
     }
   };
@@ -54,7 +54,7 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
           프로필을 설정해 주세요
         </h1>
         <p className="text-[10px] text-slate-400 mt-3 font-black uppercase tracking-widest">
-          VERIFIED PHONE: <span className="text-teal-500">{phoneNumber}</span>
+          CONNECTED EMAIL: <span className="text-teal-500">{email}</span>
         </p>
       </div>
 
