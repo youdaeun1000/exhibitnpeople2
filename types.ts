@@ -62,7 +62,6 @@ export type ViewType =
   | 'meeting' 
   | 'meeting-detail'
   | 'chat' 
-  | 'chat-list'
   | 'profile' 
   | 'meeting-create' 
   | 'chat-room' 
@@ -86,8 +85,6 @@ export interface Tour {
   userName?: string;
   createdAt: any; 
   likeCount: number;
-  tourDate?: string;
-  tourTime?: string;
 }
 
 export interface Participant {
@@ -123,15 +120,6 @@ export interface ChatMessage {
   senderName: string;
   text: string;
   createdAt: number;
-}
-
-export interface ChatRoomMetadata {
-  id: string;
-  meetingTitle: string;
-  participants: string[];
-  lastMessage: string;
-  lastMessageAt: any;
-  createdAt: any;
 }
 
 export type ReportReason = '스팸 / 광고' | '부적절한 언행' | '괴롭힘 / 혐오' | '기타';

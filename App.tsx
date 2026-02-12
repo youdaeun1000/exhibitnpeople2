@@ -1,6 +1,6 @@
 
-import { db, formatToFirebasePhone } from './firebase'
-import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, collection, addDoc, query, where, getDocs, orderBy, deleteDoc, onSnapshot } from 'firebase/firestore'
+import { db } from './firebase'
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, serverTimestamp, collection, addDoc, query, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore'
 import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -9,6 +9,11 @@ import OperatingHoursForm from './components/OperatingHoursForm';
 import ExhibitionList from './components/ExhibitionList';
 import ExhibitionDetail from './components/ExhibitionDetail';
 import MyTourSession from './components/MyTourSession';
+import MeetingCreate from './components/MeetingCreate';
+import MeetingList from './components/MeetingList';
+import MeetingDetail from './components/MeetingDetail';
+import ChatRoom from './components/ChatRoom';
+import ChatList from './components/ChatList';
 import ProfileView from './components/ProfileView';
 import SettingsView from './components/SettingsView';
 import BlockedManagementView from './components/BlockedManagementView';
@@ -17,21 +22,15 @@ import LoginView from './components/LoginView';
 import WithdrawalGuideView from './components/WithdrawalGuideView';
 import ReportGuideView from './components/ReportGuideView';
 import CustomerServiceView from './components/CustomerServiceView';
-import ReportModal from './components/ReportModal';
 import ExhibitionMeetingsView from './components/ExhibitionMeetingsView';
-import MeetingDetail from './components/MeetingDetail';
-import ChatRoom from './components/ChatRoom';
-import ChatList from './components/ChatList';
-// Fixed: Added Participant to the imports to resolve the error on line 578
-import { ExhibitionData, ViewType, Tour, Meeting, DayOfWeek, TourStop, UserRole, ReportReason, ChatMessage, ChatRoomMetadata, Participant } from './types';
+import ReportModal from './components/ReportModal';
+import { ExhibitionData, ViewType, Tour, Meeting, ChatMessage, DayOfWeek, TourStop, UserRole, ReportReason } from './types';
 import { DUMMY_EXHIBITIONS, DUMMY_USERS, DAYS, REGIONS } from './constants';
-
-const SUSPENDED_PHONE_NUMBERS = ['01000000000'];
 
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [pendingPhone, setPendingPhone] = useState('');
+  const [pendingUser, setPendingUser] = useState<{uid: string, email: string, name: string} | null>(null);
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savingMessage, setSavingMessage] = useState('정보를 처리하고 있습니다...');
@@ -39,14 +38,15 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('list');
   const [history, setHistory] = useState<ViewType[]>([]);
   const [selectedExhibitionId, setSelectedExhibitionId] = useState<string | null>(null);
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [editingExhibitionId, setEditingExhibitionId] = useState<string | null>(null);
   const [pendingEditTour, setPendingEditTour] = useState<Tour | null>(null);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const [selectedExhibitionForMeetings, setSelectedExhibitionForMeetings] = useState<{id: string, title: string} | null>(null);
   
   const [currentUser, setCurrentUser] = useState({
     id: '',
     name: '익명',
-    phoneNumber: '',
+    email: '',
     instagramUrl: null as string | null,
     bio: null as string | null,
     role: 'Viewer' as UserRole,
@@ -56,13 +56,13 @@ const App: React.FC = () => {
   const [likedExhibitionIds, setLikedExhibitionIds] = useState<Set<string>>(new Set());
   const [targetUserData, setTargetUserData] = useState<{id: string, name: string, instagramUrl: string | null, bio: string | null, role: UserRole} | null>(null);
   const [isTargetLoading, setIsTargetLoading] = useState(false);
+  const [chatRooms, setChatRooms] = useState<any[]>([]);
   const [exhibitions, setExhibitions] = useState<ExhibitionData[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [tourExhibitionIds, setTourExhibitionIds] = useState<string[]>([]);
   const [createdTours, setCreatedTours] = useState<Tour[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [chatRooms, setChatRooms] = useState<ChatRoomMetadata[]>([]);
-  const [currentChatMessages, setCurrentChatMessages] = useState<ChatMessage[]>([]);
 
   // For Reporting
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -81,6 +81,57 @@ const App: React.FC = () => {
   });
 
   const [isSuccess, setIsSuccess] = useState(false);
+
+  useEffect(() => {
+    let unsubscribe: () => void = () => {};
+    if (currentView === 'chat-room' && selectedMeetingId) {
+      const q = query(
+        collection(db, "chats", selectedMeetingId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        const msgs = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            meetingId: selectedMeetingId,
+            senderId: data.senderId,
+            senderName: data.senderName,
+            text: data.text,
+            createdAt: data.createdAt?.toMillis() || Date.now(),
+          } as ChatMessage;
+        });
+        setMessages(msgs);
+      });
+    }
+    return () => unsubscribe();
+  }, [currentView, selectedMeetingId]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser.id) {
+      setChatRooms([]);
+      return;
+    }
+    const q = query(
+      collection(db, "chats"),
+      where("participants", "array-contains", currentUser.id)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const rooms = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      rooms.sort((a: any, b: any) => {
+        const timeA = a.lastMessageAt?.toMillis() || 0;
+        const timeB = b.lastMessageAt?.toMillis() || 0;
+        return timeB - timeA;
+      });
+      setChatRooms(rooms);
+    }, (error) => {
+      console.error("채팅방 목록 로드 실패:", error);
+    });
+    return () => unsubscribe();
+  }, [isLoggedIn, currentUser.id]);
 
   const fetchExhibitions = async () => {
     try {
@@ -117,13 +168,38 @@ const App: React.FC = () => {
     try {
       const q = query(collection(db, "meetings"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
+      const creatorIds: string[] = Array.from(new Set(querySnapshot.docs.map(doc => doc.data().creatorId as string))).filter((id): id is string => !!id);
+      
+      const userProfiles: Record<string, string> = {};
+      await Promise.all(creatorIds.map(async (uid: string) => {
+        try {
+          const uDoc = await getDoc(doc(db, "Users", uid));
+          if (uDoc.exists()) {
+            const userData = uDoc.data();
+            userProfiles[uid] = userData.nickname || userData.name || '알 수 없음';
+          }
+        } catch (e) {
+          console.error(`User profile fetch error (${uid}):`, e);
+        }
+      }));
+
       const fetched = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        return {
-          id: doc.id,
+        const meetingDateStr = data.meetingDate && data.meetingDate.toDate ? data.meetingDate.toDate().toISOString().split('T')[0] : '';
+        const meetingTimeStr = data.meetingDate && data.meetingDate.toDate ? data.meetingDate.toDate().toTimeString().split(' ')[0].slice(0, 5) : '';
+        
+        return { 
+          id: doc.id, 
           ...data,
-          meetingDate: data.meetingDate?.toDate ? data.meetingDate.toDate().toISOString().split('T')[0] : data.meetingDate,
-        }
+          targetId: data.targetId || data.tourId || data.exhibitionId || '',
+          targetType: data.targetType || (data.tourId ? 'tour' : 'exhibition'),
+          location: data.meetingPlace || data.location || '',
+          creatorName: userProfiles[data.creatorId as string] || '알 수 없음',
+          meetingDate: meetingDateStr,
+          meetingTime: meetingTimeStr,
+          participants: (data.participants || []).map((p: any) => typeof p === 'string' ? { userId: p, status: 'accepted', userName: '참가자' } : p),
+          kickedUserIds: data.kickedUserIds || []
+        };
       }) as any[];
       setMeetings(fetched);
     } catch (error) {
@@ -137,52 +213,23 @@ const App: React.FC = () => {
     fetchMeetings();
   }, []);
 
-  // Listen for Chat Rooms
-  useEffect(() => {
-    if (!isLoggedIn || !currentUser.id) return;
-    const q = query(collection(db, "chats"), where("participants", "array-contains", currentUser.id), orderBy("lastMessageAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ChatRoomMetadata[];
-      setChatRooms(fetched);
-    });
-    return () => unsubscribe();
-  }, [isLoggedIn, currentUser.id]);
-
-  // Listen for Messages when in a chat room
-  useEffect(() => {
-    if (currentView !== 'chat-room' || !selectedMeetingId) {
-      setCurrentChatMessages([]);
-      return;
-    }
-    const q = query(collection(db, "chats", selectedMeetingId, "messages"), orderBy("createdAt", "asc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      setCurrentChatMessages(fetched);
-    });
-    return () => unsubscribe();
-  }, [currentView, selectedMeetingId]);
-
   const fetchUserFavorites = async (userId: string) => {
     try {
       const uRef = doc(db, "Users", userId);
       const uDoc = await getDoc(uRef);
       if (uDoc.exists()) {
         const data = uDoc.data();
-        if (data.favorites && Array.isArray(data.favorites)) {
-          setLikedExhibitionIds(new Set(data.favorites));
-        }
+        if (data.favorites && Array.isArray(data.favorites)) setLikedExhibitionIds(new Set(data.favorites));
         
         setCurrentUser(prev => ({ 
           ...prev, 
-          name: data.nickname || data.name || prev.name,
+          name: data.nickname || data.name || '알 수 없음',
           instagramUrl: data.instagramUrl || null,
           bio: data.bio || null,
           role: data.role || 'Viewer'
         }));
       }
-    } catch (error) { 
-      console.error("사용자 정보 동기화 실패:", error); 
-    }
+    } catch (error) { console.error("좋아요 목록 동기화 실패:", error); }
   };
 
   useEffect(() => {
@@ -196,48 +243,181 @@ const App: React.FC = () => {
   }, []);
 
   const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id);
+  const [meetingContext, setMeetingContext] = useState<{ id: string, title: string, type: 'exhibition' | 'tour', location: string } | null>(null);
   const [isTourCreating, setIsTourCreating] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
-  const handleLikeToggle = async (exhibitionId: string) => {
-    if (!isLoggedIn) { 
-      setShowLoginOverlay(true); 
-      return; 
+  const navigateTo = (view: ViewType) => {
+    if (['chat', 'profile', 'settings', 'register'].includes(view)) {
+      if (!isLoggedIn) { setShowLoginOverlay(true); return; }
     }
-    
+    setHistory(prev => [...prev, currentView]);
+    setCurrentView(view);
+    window.scrollTo({ top: 0 });
+  };
+
+  const handleExhibitionSelect = (ex: ExhibitionData) => {
+    setSelectedExhibitionId(ex.id);
+    navigateTo('exhibition-detail');
+  };
+
+  const handleMeetingSelect = (id: string) => {
+    setSelectedMeetingId(id);
+    navigateTo('meeting-detail');
+  };
+
+  const formatDayList = (dayList: DayOfWeek[]) => {
+    if (dayList.length === 0) return '';
+    if (dayList.length === 7) return '매일';
+    const sortedDays = [...dayList].sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
+    const dayIndices = sortedDays.map(d => DAYS.indexOf(d));
+    const segments: string[] = [];
+    let start = dayIndices[0];
+    let end = dayIndices[0];
+    for (let i = 1; i < dayIndices.length; i++) {
+      if (dayIndices[i] === end + 1) {
+        end = dayIndices[i];
+      } else {
+        segments.push(start === end ? DAYS[start] : `${DAYS[start]}~${DAYS[end]}`);
+        start = dayIndices[i];
+        end = dayIndices[i];
+      }
+    }
+    segments.push(start === end ? DAYS[start] : `${DAYS[start]}~${DAYS[end]}`);
+    return segments.join(', ');
+  };
+
+  const handleSendMessage = async (text: string) => {
+    if (!selectedMeetingId) return;
+    try {
+      await addDoc(collection(db, "chats", selectedMeetingId, "messages"), {
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: text,
+        createdAt: serverTimestamp()
+      });
+      const meeting = meetings.find(m => m.id === selectedMeetingId);
+      const meetingTitle = meeting ? meeting.title : "알 수 없는 모임";
+      await setDoc(doc(db, "chats", selectedMeetingId), {
+        lastMessage: text,
+        lastMessageAt: serverTimestamp(),
+        participants: arrayUnion(currentUser.id),
+        meetingTitle: meetingTitle
+      }, { merge: true });
+    } catch (error) {
+      console.error("메시지 전송 실패:", error);
+      alert("메시지 전송에 실패했습니다.");
+    }
+  };
+
+  const handleLeaveChat = async (chatId: string) => {
+    if (!window.confirm("채팅방에서 나가시겠습니까? 나간 후에는 대화 내용을 볼 수 없으며 다시 참여하려면 모임 신청이 필요할 수 있습니다.")) return;
+    setIsSaving(true);
+    setSavingMessage('채팅방을 나가는 중입니다...');
+    try {
+      const chatRef = doc(db, "chats", chatId);
+      await updateDoc(chatRef, {
+        participants: arrayRemove(currentUser.id)
+      });
+      alert('정상적으로 처리되었습니다.');
+    } catch (error) {
+      console.error("채팅방 나가기 오류:", error);
+      alert("처리 중 오류가 발생했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleJoinRequest = async (meetingId: string) => {
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting) return;
+    requireAuth(async () => {
+      if (meeting.kickedUserIds?.includes(currentUser.id)) {
+        alert("이 모임에는 더 이상 참여할 수 없습니다.");
+        return;
+      }
+      const isAlreadyParticipating = meeting.creatorId === currentUser.id || 
+        meeting.participants.some(p => p.userId === currentUser.id);
+      if (isAlreadyParticipating) {
+        alert("이미 참여 중인 모임입니다.");
+        return;
+      }
+      const acceptedCount = meeting.participants.filter(p => p.status === 'accepted').length + 1;
+      if (acceptedCount >= meeting.maxParticipants) {
+        alert("정원이 초과되어 신청할 수 없습니다.");
+        return;
+      }
+      const answer = window.prompt(meeting.question || "참가 신청 답변을 입력해주세요.");
+      if (answer === null) return;
+      if (!answer.trim()) {
+        alert("답변을 입력해야 신청이 가능합니다.");
+        return;
+      }
+      setIsSaving(true);
+      setSavingMessage("참가 신청을 처리하고 있습니다...");
+      try {
+        const meetingRef = doc(db, "meetings", meetingId);
+        await updateDoc(meetingRef, {
+          participants: arrayUnion(currentUser.id)
+        });
+        const chatRef = doc(db, "chats", meetingId);
+        await setDoc(chatRef, {
+          participants: arrayUnion(currentUser.id),
+          lastMessage: `${currentUser.name}님이 참여하셨습니다.`,
+          lastMessageAt: serverTimestamp(),
+          meetingTitle: meeting.title
+        }, { merge: true });
+        alert("참가 신청이 완료되었습니다.");
+        await fetchMeetings();
+      } catch (error) {
+        console.error("모임 신청 오류:", error);
+        alert("신청 처리 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      } finally {
+        setIsSaving(false);
+      }
+    });
+  };
+
+  const handleKickParticipant = async (meetingId: string, userId: string) => {
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting || meeting.creatorId !== currentUser.id) return;
+    if (!window.confirm("이 사용자를 모임에서 내보내시겠어요?")) return;
+    setIsSaving(true);
+    setSavingMessage('참여자를 내보내는 중입니다...');
+    try {
+      const meetingRef = doc(db, "meetings", meetingId);
+      const chatRef = doc(db, "chats", meetingId);
+      const updatedParticipants = meeting.participants.filter(p => p.userId !== userId);
+      await updateDoc(meetingRef, {
+        participants: updatedParticipants,
+        kickedUserIds: arrayUnion(userId)
+      });
+      await updateDoc(chatRef, {
+        participants: arrayRemove(userId)
+      });
+      alert('해당 사용자가 모임에서 제외되었습니다.');
+      await fetchMeetings();
+    } catch (error) {
+      console.error("내보내기 오류:", error);
+      alert('처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLikeToggle = async (exhibitionId: string) => {
+    if (!isLoggedIn) { setShowLoginOverlay(true); return; }
     const isAlreadyLiked = likedExhibitionIds.has(exhibitionId);
-    
     setLikedExhibitionIds(prev => {
       const next = new Set(prev);
       if (isAlreadyLiked) next.delete(exhibitionId);
       else next.add(exhibitionId);
       return next;
     });
-
     try {
       const userRef = doc(db, "Users", currentUser.id);
-      await updateDoc(userRef, { 
-        favorites: isAlreadyLiked ? arrayRemove(exhibitionId) : arrayUnion(exhibitionId) 
-      });
-    } catch (error) { 
-      console.error("좋아요 DB 업데이트 실패:", error);
-      setLikedExhibitionIds(prev => {
-        const next = new Set(prev);
-        if (isAlreadyLiked) next.add(exhibitionId);
-        else next.delete(exhibitionId);
-        return next;
-      });
-      alert('좋아요 처리에 실패했습니다. 다시 시도해 주세요.');
-    }
-  };
-
-  const navigateTo = (view: ViewType) => {
-    if (['profile', 'settings', 'register', 'mytour', 'chat-list', 'chat-room'].includes(view)) {
-      if (!isLoggedIn) { setShowLoginOverlay(true); return; }
-    }
-    setHistory(prev => [...prev, currentView]);
-    setCurrentView(view);
-    window.scrollTo({ top: 0 });
+      await updateDoc(userRef, { favorites: isAlreadyLiked ? arrayRemove(exhibitionId) : arrayUnion(exhibitionId) });
+    } catch (error) { console.error("좋아요 DB 업데이트 실패:", error); }
   };
 
   const requireAuth = (callback: () => void) => {
@@ -254,49 +434,64 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0 });
   };
 
-  const handleExhibitionSelect = (ex: ExhibitionData) => {
-    setSelectedExhibitionId(ex.id);
-    navigateTo('exhibition-detail');
+  const resetForm = () => {
+    setFormData({
+      representativeLink: '',
+      title: '',
+      artist: '',
+      startDate: '',
+      endDate: '',
+      selectedDays: [...DAYS],
+      closingNote: '',
+      galleryName: '',
+      region: '삼청/인사'
+    });
+    setEditingExhibitionId(null);
   };
 
-  const handleJoinMeetingClick = (ex: ExhibitionData) => {
+  const handleAddExhibitionClick = () => {
+    requireAuth(() => { resetForm(); navigateTo('register'); });
+  };
+
+  const handleJoinMeetingClick = (id: string, title: string) => {
     requireAuth(() => {
-      setSelectedExhibitionId(ex.id);
+      setSelectedExhibitionForMeetings({id, title});
       navigateTo('exhibition-meetings');
     });
   };
 
-  const handleVerifyComplete = (phone: string, isExisting: boolean) => {
+  const handleVerifyComplete = (userData: {uid: string, email: string, name: string}, isExisting: boolean) => {
     if (isExisting) {
-      const existingUser = DUMMY_USERS[0]; 
-      if (existingUser) {
-        const userWithMeta = { 
-          ...existingUser, 
-          instagramUrl: (existingUser as any).instagramUrl || null,
-          bio: (existingUser as any).bio || null,
-          role: (existingUser as any).role || 'Viewer' as UserRole
-        };
-        setCurrentUser(userWithMeta);
-        localStorage.setItem('exhibireg_user', JSON.stringify(userWithMeta));
-        setIsLoggedIn(true);
-        setShowLoginOverlay(false);
-        fetchUserFavorites(existingUser.id);
-      }
-    } else { 
-      setPendingPhone(phone); 
-      setIsNewUser(true); 
+      // 기존 유저는 바로 로그인
+      const user = {
+        id: userData.uid,
+        name: userData.name,
+        email: userData.email,
+        instagramUrl: null,
+        bio: null,
+        role: 'Viewer' as UserRole,
+        lastNicknameChangedAt: 0
+      };
+      setCurrentUser(user);
+      localStorage.setItem('exhibireg_user', JSON.stringify(user));
+      setIsLoggedIn(true);
+      setShowLoginOverlay(false);
+      fetchUserFavorites(userData.uid);
+    } else {
+      // 신규 유저는 프로필 설정으로
+      setPendingUser(userData);
+      setIsNewUser(true);
     }
   };
 
-  const handleSignupComplete = async (userData: { name: string; phoneNumber: string }) => {
-    if (isSaving) return;
+  const handleSignupComplete = async (userData: { name: string; email: string }) => {
+    if (isSaving || !pendingUser) return;
     setIsSaving(true);
-    const userId = `user_${Date.now()}`;
-    const formattedPhone = formatToFirebasePhone(userData.phoneNumber);
+    const userId = pendingUser.uid;
     try {
       await setDoc(doc(db, "Users", userId), {
         userId: userId, 
-        phone: formattedPhone, 
+        email: userData.email, 
         nickname: userData.name, 
         favorites: [], 
         instagramUrl: null, 
@@ -307,7 +502,7 @@ const App: React.FC = () => {
       const newUser = { 
         id: userId, 
         name: userData.name, 
-        phoneNumber: userData.phoneNumber, 
+        email: userData.email, 
         instagramUrl: null, 
         bio: null, 
         role: 'Viewer' as UserRole, 
@@ -319,18 +514,12 @@ const App: React.FC = () => {
       setIsNewUser(false); 
       setShowLoginOverlay(false);
       setLikedExhibitionIds(new Set());
-    } catch (error) { 
-      console.error('가입 오류:', error); 
-    } finally { 
-      setIsSaving(false); 
-    }
+    } catch (error) { console.error('가입 오류:', error); } finally { setIsSaving(false); }
   };
 
   const handleUserClick = async (userId: string) => {
-    setSelectedUserId(userId); 
-    navigateTo('user-profile');
-    setIsTargetLoading(true); 
-    setTargetUserData(null);
+    setSelectedUserId(userId); navigateTo('user-profile');
+    setIsTargetLoading(true); setTargetUserData(null);
     try {
       const uRef = doc(db, "Users", userId);
       const uDoc = await getDoc(uRef);
@@ -344,11 +533,7 @@ const App: React.FC = () => {
           role: data.role || 'Viewer'
         });
       }
-    } catch (error) { 
-      console.error("사용자 정보 조회 실패:", error); 
-    } finally { 
-      setIsTargetLoading(false); 
-    }
+    } catch (error) { console.error("사용자 정보 조회 실패:", error); } finally { setIsTargetLoading(false); }
   };
 
   const handleBlockToggle = (id: string) => {
@@ -433,27 +618,6 @@ const App: React.FC = () => {
     }
   };
 
-  const formatDayList = (dayList: DayOfWeek[]) => {
-    if (dayList.length === 0) return '';
-    if (dayList.length === 7) return '매일';
-    const sortedDays = [...dayList].sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
-    const dayIndices = sortedDays.map(d => DAYS.indexOf(d));
-    const segments: string[] = [];
-    let start = dayIndices[0];
-    let end = dayIndices[0];
-    for (let i = 1; i < dayIndices.length; i++) {
-      if (dayIndices[i] === end + 1) {
-        end = dayIndices[i];
-      } else {
-        segments.push(start === end ? DAYS[start] : `${DAYS[start]}~${DAYS[end]}`);
-        start = dayIndices[i];
-        end = dayIndices[i];
-      }
-    }
-    segments.push(start === end ? DAYS[start] : `${DAYS[start]}~${DAYS[end]}`);
-    return segments.join(', ');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title) { alert('전시 제목을 입력해 주세요.'); return; }
@@ -493,7 +657,7 @@ const App: React.FC = () => {
     } catch (error) { console.error('전시 저장 중 오류 발생:', error); } finally { setIsSaving(false); }
   };
 
-  const handleCreateTour = async (title: string, stops: TourStop[], tourDate?: string, tourTime?: string) => {
+  const handleCreateTour = async (title: string, stops: TourStop[]) => {
     if (stops.length === 0) { alert('코스에 전시나 티타임을 최소 하나 이상 추가해 주세요.'); return; }
     requireAuth(async () => {
       setIsSaving(true);
@@ -506,8 +670,6 @@ const App: React.FC = () => {
         const exhibitionIds = stops.filter(s => s.type === 'exhibition').map(s => s.exhibitionId!);
         await addDoc(collection(db, "tours"), {
           title, exhibitionIds, steps, creatorId: currentUser.id, userName: currentUser.name, createdAt: serverTimestamp(), likeCount: 0,
-          tourDate: tourDate || null,
-          tourTime: tourTime || null
         });
         alert('투어가 저장되었습니다');
         setIsTourCreating(false);
@@ -516,7 +678,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleUpdateTourData = async (id: string, title: string, stops: TourStop[], tourDate?: string, tourTime?: string) => {
+  const handleUpdateTourData = async (id: string, title: string, stops: TourStop[]) => {
     if (stops.length === 0) { alert('코스에 전시나 티타임을 최소 하나 이상 추가해 주세요.'); return; }
     setIsSaving(true);
     setSavingMessage('투어 정보를 수정하고 있습니다...');
@@ -526,11 +688,7 @@ const App: React.FC = () => {
         return { type: 'teatime' };
       });
       const exhibitionIds = stops.filter(s => s.type === 'exhibition').map(s => s.exhibitionId!);
-      await updateDoc(doc(db, "tours", id), { 
-        title, exhibitionIds, steps, updatedAt: serverTimestamp(),
-        tourDate: tourDate || null,
-        tourTime: tourTime || null
-      });
+      await updateDoc(doc(db, "tours", id), { title, exhibitionIds, steps, updatedAt: serverTimestamp() });
       alert('투어가 저장되었습니다');
       await fetchTours();
     } catch (error) { console.error("투어 수정 오류:", error); alert('투어 수정 중 오류가 발생했습니다.'); } finally { setIsSaving(false); }
@@ -544,66 +702,8 @@ const App: React.FC = () => {
     } catch (error) { console.error("투어 삭제 오류:", error); alert('투어 삭제 중 오류가 발생했습니다.'); }
   };
 
-  const handleSelectMeeting = (id: string) => {
-    setSelectedMeetingId(id);
-    navigateTo('meeting-detail');
-  };
-
-  const handleSendMessage = async (text: string) => {
-    if (!selectedMeetingId || !currentUser.id) return;
-    try {
-      const chatRef = doc(db, "chats", selectedMeetingId);
-      await addDoc(collection(chatRef, "messages"), {
-        meetingId: selectedMeetingId,
-        senderId: currentUser.id,
-        senderName: currentUser.name,
-        text,
-        createdAt: Date.now()
-      });
-      await updateDoc(chatRef, {
-        lastMessage: text,
-        lastMessageAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error("메시지 전송 실패:", error);
-    }
-  };
-
-  const handleJoinRequest = async (meetingId: string) => {
-    requireAuth(async () => {
-      try {
-        const mRef = doc(db, "meetings", meetingId);
-        const mDoc = await getDoc(mRef);
-        if (!mDoc.exists()) return;
-        
-        const participant: Participant = {
-          userId: currentUser.id,
-          userName: currentUser.name,
-          status: 'accepted', // 데모용 자동 수락, 실제론 'pending'
-          answer: '참가 신청합니다.'
-        };
-        
-        await updateDoc(mRef, {
-          participants: arrayUnion(participant)
-        });
-        
-        const chatRef = doc(db, "chats", meetingId);
-        await updateDoc(chatRef, {
-          participants: arrayUnion(currentUser.id),
-          lastMessage: `${currentUser.name}님이 모임에 참여했습니다.`,
-          lastMessageAt: serverTimestamp()
-        });
-
-        alert('모임 참여가 완료되었습니다!');
-        fetchMeetings();
-      } catch (error) {
-        console.error("참여 신청 실패:", error);
-      }
-    });
-  };
-
   if (showLoginOverlay) {
-    if (isNewUser) return <SignupView phoneNumber={pendingPhone} onSignupComplete={handleSignupComplete} />;
+    if (isNewUser && pendingUser) return <SignupView email={pendingUser.email} onSignupComplete={handleSignupComplete} />;
     return (
       <div className="fixed inset-0 z-[2000] bg-white max-w-lg mx-auto overflow-y-auto">
         <div className="absolute top-8 left-8 z-[2001]">
@@ -611,24 +711,17 @@ const App: React.FC = () => {
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
-        <LoginView onVerifyComplete={handleVerifyComplete} suspendedNumbers={SUSPENDED_PHONE_NUMBERS} existingPhoneNumbers={DUMMY_USERS.map(u => u.phoneNumber)} />
+        <LoginView onVerifyComplete={handleVerifyComplete} />
       </div>
     );
   }
 
-  const shouldShowHeader = !isTourCreating && !['exhibition-detail', 'user-profile', 'register', 'settings', 'blocked-management', 'withdrawal-guide', 'report-guide', 'customer-service', 'exhibition-meetings', 'meeting-detail', 'chat-room'].includes(currentView);
-  const shouldShowBottomNav = !isTourCreating && ['list', 'mytour', 'profile', 'chat-list'].includes(currentView);
+  const shouldShowHeader = !isTourCreating && !['exhibition-detail', 'meeting-detail', 'meeting-create', 'chat-room', 'user-profile', 'register', 'settings', 'blocked-management', 'withdrawal-guide', 'report-guide', 'customer-service', 'exhibition-meetings'].includes(currentView);
+  const shouldShowBottomNav = !isTourCreating && ['list', 'mytour', 'meeting', 'chat', 'profile'].includes(currentView);
 
   return (
     <div className="max-w-lg mx-auto bg-white min-h-screen relative flex flex-col">
-      {shouldShowHeader && (
-        <Header 
-          showAddButton={currentView === 'list'} 
-          onAddClick={() => requireAuth(() => { setEditingExhibitionId(null); navigateTo('register'); })} 
-          isLoggedIn={isLoggedIn} 
-          onLoginClick={() => setShowLoginOverlay(true)} 
-        />
-      )}
+      {shouldShowHeader && <Header showAddButton={currentView === 'list'} onAddClick={handleAddExhibitionClick} isLoggedIn={isLoggedIn} onLoginClick={() => setShowLoginOverlay(true)} />}
       <main ref={mainRef} className={`flex-1 ${shouldShowBottomNav ? 'pb-24' : ''}`}>
         {isSaving ? (
           <div className="min-h-[80vh] flex flex-col items-center justify-center p-12 text-center bg-white">
@@ -642,14 +735,7 @@ const App: React.FC = () => {
             <button onClick={() => { setIsSuccess(false); setCurrentView('list'); setHistory([]); }} className="w-full py-5 bg-slate-800 text-white font-black rounded-[2rem] active:scale-[0.98] transition-all">확인</button>
           </div>
         ) : currentView === 'list' ? (
-          <ExhibitionList 
-            exhibitions={exhibitions} 
-            onSelect={handleExhibitionSelect} 
-            onJoinMeeting={handleJoinMeetingClick}
-            likedIds={likedExhibitionIds} 
-            onLikeToggle={handleLikeToggle} 
-            currentUserId={currentUser.id} 
-          />
+          <ExhibitionList exhibitions={exhibitions} onSelect={handleExhibitionSelect} likedIds={likedExhibitionIds} onLikeToggle={handleLikeToggle} onJoinMeetingClick={handleJoinMeetingClick} currentUserId={currentUser.id} />
         ) : currentView === 'exhibition-detail' && selectedExhibitionId ? (
           <ExhibitionDetail 
             exhibitionId={selectedExhibitionId} 
@@ -662,128 +748,37 @@ const App: React.FC = () => {
             onBack={goBack} 
             onLikeToggle={() => handleLikeToggle(selectedExhibitionId)} 
             onSelectTour={(t) => {}} 
-            onSelectMeeting={handleSelectMeeting} 
+            onSelectMeeting={handleMeetingSelect} 
             onSelectUser={handleUserClick} 
-          />
-        ) : currentView === 'exhibition-meetings' && selectedExhibitionId ? (
-          <ExhibitionMeetingsView 
-            exhibitionId={selectedExhibitionId}
-            exhibitionTitle={exhibitions.find(e => e.id === selectedExhibitionId)?.title || ''}
-            meetings={meetings}
-            currentUserId={currentUser.id}
-            onBack={goBack}
-            onSelectMeeting={handleSelectMeeting}
-            onCreateNew={() => requireAuth(() => navigateTo('meeting-create'))}
-            onSelectUser={handleUserClick}
-          />
-        ) : currentView === 'meeting-detail' && selectedMeetingId ? (
-          <MeetingDetail 
-            meeting={meetings.find(m => m.id === selectedMeetingId)!}
-            allExhibitions={exhibitions}
-            allTours={createdTours}
-            onBack={goBack}
-            onSelectExhibition={handleExhibitionSelect}
-            onSelectTour={(t) => {}}
-            onAcceptParticipant={() => {}}
-            onEnterChat={() => navigateTo('chat-room')}
-            currentUserId={currentUser.id}
-            onJoinRequest={() => handleJoinRequest(selectedMeetingId)}
-            onSelectUser={handleUserClick}
-          />
-        ) : currentView === 'chat-list' ? (
-          <ChatList
-            rooms={chatRooms}
-            meetings={meetings}
-            onSelectRoom={(id) => { setSelectedMeetingId(id); navigateTo('chat-room'); }}
-            onLeaveChat={(id) => { /* 탈퇴 로직 */ }}
-          />
-        ) : currentView === 'chat-room' && selectedMeetingId ? (
-          <ChatRoom
-            meetingId={selectedMeetingId}
-            meeting={meetings.find(m => m.id === selectedMeetingId)!}
-            allExhibitions={exhibitions}
-            allTours={createdTours}
-            messages={currentChatMessages}
-            onBack={goBack}
-            onSelectExhibition={handleExhibitionSelect}
-            onSelectTour={() => {}}
-            onSelectMeeting={handleSelectMeeting}
-            onSendMessage={handleSendMessage}
-            currentUserId={currentUser.id}
-            onSelectUser={handleUserClick}
           />
         ) : currentView === 'mytour' ? (
-          <MyTourSession 
-            likedExhibitions={exhibitions.filter(ex => likedExhibitionIds.has(ex.id))} 
-            likedExhibitionIds={likedExhibitionIds} 
-            onSelectExhibition={handleExhibitionSelect} 
-            tourExhibitionIds={tourExhibitionIds} 
-            onUpdateTour={setTourExhibitionIds} 
-            createdTours={createdTours.filter(t => !blockedIds.has(t.creatorId))} 
-            onCreateTour={handleCreateTour} 
-            onUpdateTourData={handleUpdateTourData} 
-            onDeleteTour={handleDeleteTour} 
-            onLikeTourToggle={(id) => {}} 
-            onTourSelect={(t) => {}} 
+          <MyTourSession likedExhibitions={exhibitions.filter(ex => likedExhibitionIds.has(ex.id))} likedExhibitionIds={likedExhibitionIds} onSelectExhibition={handleExhibitionSelect} tourExhibitionIds={tourExhibitionIds} onUpdateTour={setTourExhibitionIds} createdTours={createdTours.filter(t => !blockedIds.has(t.creatorId))} onCreateTour={handleCreateTour} onUpdateTourData={handleUpdateTourData} onDeleteTour={handleDeleteTour} onLikeTourToggle={(id) => {}} onTourSelect={(t) => {}} allExhibitions={exhibitions} onSelectExhibitionRaw={handleExhibitionSelect} onCreateMeeting={(id, title) => requireAuth(() => { const tour = createdTours.find(ct => ct.id === id); const firstExId = tour?.exhibitionIds?.[0]; setMeetingContext({ id, title, type: 'tour', location: exhibitions.find(e => e.id === (firstExId || ''))?.region || '' }); navigateTo('meeting-create'); })} onCreatingStateChange={setIsTourCreating} requireAuth={requireAuth} currentUserId={currentUser.id} initialEditTour={pendingEditTour} onEditStarted={() => setPendingEditTour(null)} />
+        ) : currentView === 'meeting' ? (
+          <MeetingList meetings={meetings.filter(m => !blockedIds.has(m.creatorId))} allExhibitions={exhibitions} allTours={createdTours} currentUserId={currentUser.id} onSelectMeeting={handleMeetingSelect} onEnterChat={(id) => requireAuth(() => { setSelectedMeetingId(id); navigateTo('chat-room'); })} onSelectUser={handleUserClick} onJoinRequest={handleJoinRequest} onKickParticipant={handleKickParticipant} />
+        ) : currentView === 'meeting-detail' && selectedMeetingId ? (
+          <MeetingDetail 
+            meeting={meetings.find(m => m.id === selectedMeetingId)!} 
             allExhibitions={exhibitions} 
-            onSelectExhibitionRaw={handleExhibitionSelect} 
-            onCreatingStateChange={setIsTourCreating} 
-            requireAuth={requireAuth} 
-            currentUserId={currentUser.id} 
-            initialEditTour={pendingEditTour} 
-            onEditStarted={() => setPendingEditTour(null)} 
-          />
-        ) : currentView === 'profile' ? (
-          <ProfileView 
-            userId={currentUser.id} 
-            userName={currentUser.name} 
-            instagramUrl={currentUser.instagramUrl} 
-            bio={currentUser.bio} 
-            role={currentUser.role} 
-            isMe={true} 
-            myBlockedIds={blockedIds} 
-            likedExhibitionIds={likedExhibitionIds} 
-            meetings={meetings} 
-            tours={createdTours} 
-            allExhibitions={exhibitions} 
+            allTours={createdTours} 
             onBack={goBack} 
-            onBlockToggle={handleBlockToggle} 
-            onReport={handleReportUser} 
-            onSelectMeeting={handleSelectMeeting} 
-            onSelectTour={() => {}} 
             onSelectExhibition={handleExhibitionSelect} 
+            onSelectTour={(t) => {}} 
+            onAcceptParticipant={() => {}} 
+            onEnterChat={() => requireAuth(() => { setSelectedMeetingId(selectedMeetingId); navigateTo('chat-room'); })} 
+            currentUserId={currentUser.id} 
+            onJoinRequest={() => handleJoinRequest(selectedMeetingId)} 
             onSelectUser={handleUserClick} 
-            onGoSettings={() => navigateTo('settings')} 
-            onNicknameChange={handleNicknameChange} 
-            onInstagramUrlChange={handleInstagramUrlChange} 
-            onBioChange={handleBioChange} 
-            onRoleChange={handleRoleChange} 
+            onKickParticipant={(uid) => handleKickParticipant(selectedMeetingId, uid)} 
           />
+        ) : currentView === 'chat' ? (
+          <ChatList rooms={chatRooms} meetings={meetings} onSelectRoom={(id) => { setSelectedMeetingId(id); navigateTo('chat-room'); }} onLeaveChat={handleLeaveChat} />
+        ) : currentView === 'profile' ? (
+          <ProfileView userId={currentUser.id} userName={currentUser.name} instagramUrl={currentUser.instagramUrl} bio={currentUser.bio} role={currentUser.role} isMe={true} myBlockedIds={blockedIds} likedExhibitionIds={likedExhibitionIds} meetings={meetings} tours={createdTours} allExhibitions={exhibitions} onBack={goBack} onBlockToggle={handleBlockToggle} onReport={handleReportUser} onSelectMeeting={handleMeetingSelect} onSelectTour={(tour) => {}} onSelectExhibition={handleExhibitionSelect} onSelectUser={handleUserClick} onGoSettings={() => navigateTo('settings')} onNicknameChange={handleNicknameChange} onInstagramUrlChange={handleInstagramUrlChange} onBioChange={handleBioChange} onRoleChange={handleRoleChange} />
         ) : currentView === 'user-profile' && selectedUserId ? (
           isTargetLoading ? (
             <div className="flex flex-col items-center justify-center py-40"><div className="w-10 h-10 border-2 border-slate-200 border-t-slate-800 rounded-full animate-spin mb-6"></div><p className="text-sm font-medium text-slate-400">불러오는 중...</p></div>
           ) : targetUserData ? (
-            <ProfileView 
-              userId={targetUserData.id} 
-              userName={targetUserData.name} 
-              instagramUrl={targetUserData.instagramUrl} 
-              bio={targetUserData.bio} 
-              role={targetUserData.role} 
-              isMe={false} 
-              myBlockedIds={blockedIds} 
-              likedExhibitionIds={new Set()} 
-              meetings={meetings} 
-              tours={createdTours} 
-              allExhibitions={exhibitions} 
-              onBack={goBack} 
-              onBlockToggle={handleBlockToggle} 
-              onReport={handleReportUser} 
-              onSelectMeeting={handleSelectMeeting} 
-              onSelectTour={() => {}} 
-              onSelectExhibition={handleExhibitionSelect} 
-              onSelectUser={handleUserClick} 
-              onGoSettings={() => {}} 
-            />
+            <ProfileView userId={targetUserData.id} userName={targetUserData.name} instagramUrl={targetUserData.instagramUrl} bio={targetUserData.bio} role={targetUserData.role} isMe={false} myBlockedIds={blockedIds} likedExhibitionIds={new Set()} meetings={meetings} tours={createdTours} allExhibitions={exhibitions} onBack={goBack} onBlockToggle={handleBlockToggle} onReport={handleReportUser} onSelectMeeting={handleMeetingSelect} onSelectTour={(tour) => {}} onSelectExhibition={handleExhibitionSelect} onSelectUser={handleUserClick} onGoSettings={() => {}} />
           ) : (
             <div className="flex flex-col items-center justify-center py-40 px-10 text-center"><p className="text-sm font-medium text-slate-400">사용자를 찾을 수 없습니다.</p><button onClick={goBack} className="mt-8 px-10 py-4 bg-slate-800 text-white font-black rounded-[2rem] text-xs">뒤로 가기</button></div>
           )
@@ -794,6 +789,12 @@ const App: React.FC = () => {
         ) : currentView === 'withdrawal-guide' ? ( <WithdrawalGuideView onBack={goBack} />
         ) : currentView === 'report-guide' ? ( <ReportGuideView onBack={goBack} />
         ) : currentView === 'customer-service' ? ( <CustomerServiceView onBack={goBack} />
+        ) : currentView === 'exhibition-meetings' && selectedExhibitionForMeetings ? (
+          <ExhibitionMeetingsView exhibitionId={selectedExhibitionForMeetings.id} exhibitionTitle={selectedExhibitionForMeetings.title} meetings={meetings} currentUserId={currentUser.id} onBack={goBack} onSelectMeeting={handleMeetingSelect} onCreateNew={() => { setMeetingContext({ id: selectedExhibitionForMeetings.id, title: selectedExhibitionForMeetings.title, type: 'exhibition', location: exhibitions.find(e => e.id === selectedExhibitionForMeetings.id)?.region || '' }); navigateTo('meeting-create'); }} onSelectUser={handleUserClick} />
+        ) : currentView === 'meeting-create' && meetingContext ? (
+          <MeetingCreate context={meetingContext} onBack={goBack} onCreated={(m) => { fetchMeetings(); setCurrentView('meeting'); setHistory([]); }} currentUserId={currentUser.id} />
+        ) : currentView === 'chat-room' && selectedMeetingId ? (
+          <ChatRoom meetingId={selectedMeetingId} meeting={meetings.find(m => m.id === selectedMeetingId)!} allExhibitions={exhibitions} allTours={createdTours} messages={messages.filter(msg => msg.meetingId === selectedMeetingId)} onBack={goBack} onSelectExhibition={handleExhibitionSelect} onSelectTour={(tour) => {}} onSelectMeeting={handleMeetingSelect} onSendMessage={handleSendMessage} currentUserId={currentUser.id} onSelectUser={handleUserClick} />
         ) : currentView === 'register' ? (
           <div className="pb-32 animate-in fade-in duration-500 bg-white">
              <div className="px-8 py-10 flex items-center gap-6">

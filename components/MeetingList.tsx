@@ -54,8 +54,12 @@ const MeetingList: React.FC<MeetingListProps> = ({
         return b.createdAt - a.createdAt;
       });
     } else {
-      return meetings.filter(m => m.creatorId === currentUserId || m.participants.some(p => p.userId === currentUserId))
-        .sort((a, b) => new Date(`${b.meetingDate}T${b.meetingTime}`).getTime() - new Date(`${a.meetingDate}T${a.meetingTime}`).getTime());
+      // 내가 참여하거나 만든 모임 중에서도 지난 날짜는 제외
+      return meetings.filter(m => {
+        const isMyMeeting = m.creatorId === currentUserId || m.participants.some(p => p.userId === currentUserId);
+        const isPast = isMeetingPast(m.meetingDate, m.meetingTime);
+        return isMyMeeting && !isPast;
+      }).sort((a, b) => new Date(`${a.meetingDate}T${a.meetingTime}`).getTime() - new Date(`${b.meetingDate}T${b.meetingTime}`).getTime());
     }
   }, [meetings, activeTab, currentUserId, sortBy]);
 
@@ -89,7 +93,6 @@ const MeetingList: React.FC<MeetingListProps> = ({
           const isMember = m.creatorId === currentUserId || m.participants.some(p => p.userId === currentUserId && p.status === 'accepted');
           const isPending = m.participants.some(p => p.userId === currentUserId && p.status === 'pending');
           const isHost = m.creatorId === currentUserId;
-          const isPast = isMeetingPast(m.meetingDate, m.meetingTime);
 
           const tour = allTours.find(t => t.id === m.targetId);
           const exhibition = allExhibitions.find(e => e.id === m.targetId);
@@ -98,7 +101,7 @@ const MeetingList: React.FC<MeetingListProps> = ({
           return (
             <div 
               key={m.id} 
-              className={`group bg-slate-50 p-8 rounded-[2.5rem] transition-all relative overflow-hidden ${isPast && activeTab === 'mine' ? 'opacity-60' : ''}`}
+              className="group bg-slate-50 p-8 rounded-[2.5rem] transition-all relative overflow-hidden"
             >
               {/* Header Info */}
               <div className="flex justify-between items-start mb-8">
@@ -107,9 +110,6 @@ const MeetingList: React.FC<MeetingListProps> = ({
                     <p className="text-[10px] font-black text-teal-400 uppercase tracking-[0.15em]">
                       {formatMeetingDate(m.meetingDate)} · {m.meetingTime}
                     </p>
-                    {isPast && activeTab === 'mine' && (
-                      <span className="text-[8px] font-black bg-slate-200 text-slate-400 px-1.5 py-0.5 rounded-md">PAST</span>
-                    )}
                   </div>
                   <h3 className="font-black text-slate-800 text-xl tracking-tight leading-snug mb-4">
                     {m.title}

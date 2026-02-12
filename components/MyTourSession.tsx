@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ExhibitionData, Tour, TourStop } from '../types';
 
 interface MyTourSessionProps {
@@ -9,13 +9,14 @@ interface MyTourSessionProps {
   tourExhibitionIds: string[];
   onUpdateTour: (ids: string[]) => void;
   createdTours: Tour[];
-  onCreateTour: (title: string, stops: TourStop[], tourDate?: string, tourTime?: string) => void;
-  onUpdateTourData: (id: string, title: string, stops: TourStop[], tourDate?: string, tourTime?: string) => void;
+  onCreateTour: (title: string, stops: TourStop[]) => void;
+  onUpdateTourData: (id: string, title: string, stops: TourStop[]) => void;
   onDeleteTour: (id: string) => void;
   onLikeTourToggle: (tourId: string) => void;
   onTourSelect: (tour: Tour) => void;
   allExhibitions: ExhibitionData[];
   onSelectExhibitionRaw: (ex: ExhibitionData) => void;
+  onCreateMeeting: (id: string, title: string) => void;
   onCreatingStateChange?: (isCreating: boolean) => void;
   requireAuth: (callback: () => void) => void;
   currentUserId?: string;
@@ -23,34 +24,27 @@ interface MyTourSessionProps {
   onEditStarted?: () => void;
 }
 
-const HOURS_OPTIONS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-
 const MyTourSession: React.FC<MyTourSessionProps> = ({ 
   likedExhibitions, 
   createdTours,
   onCreateTour,
   onUpdateTourData,
   onDeleteTour,
+  onTourSelect,
   allExhibitions,
   onCreatingStateChange,
   requireAuth,
   currentUserId,
   initialEditTour,
-  onEditStarted
+  onEditStarted,
+  onCreateMeeting
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [tourName, setTourName] = useState('');
   const [editingTourId, setEditingTourId] = useState<string | null>(null);
-  const [tourDate, setTourDate] = useState('');
-  const [tourTime, setTourTime] = useState('14:00');
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(new Date());
-
   const [searchQuery, setSearchQuery] = useState('');
   const [tourStops, setTourStops] = useState<TourStop[]>([]);
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
-
-  const timeScrollRef = useRef<HTMLDivElement>(null);
 
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; // km
@@ -100,8 +94,6 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
       setEditingTourId(initialEditTour.id);
       setTourName(initialEditTour.title);
       setTourStops(initialEditTour.steps || []);
-      setTourDate(initialEditTour.tourDate || '');
-      setTourTime(initialEditTour.tourTime || '14:00');
       setActiveTab('create');
       onEditStarted?.();
     }
@@ -109,14 +101,13 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
 
   const handleSaveTour = () => {
     if (!tourName.trim() || tourStops.length === 0) return;
-    if (editingTourId) onUpdateTourData(editingTourId, tourName.trim(), [...tourStops], tourDate, tourTime);
-    else onCreateTour(tourName.trim(), [...tourStops], tourDate, tourTime);
+    if (editingTourId) onUpdateTourData(editingTourId, tourName.trim(), [...tourStops]);
+    else onCreateTour(tourName.trim(), [...tourStops]);
     resetForm();
   };
 
   const resetForm = () => {
     setTourName(''); setEditingTourId(null); setTourStops([]);
-    setTourDate(''); setTourTime('14:00');
     setActiveTab('list'); setSearchQuery('');
   };
 
@@ -152,34 +143,6 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
     setDraggedItemIndex(null);
   };
 
-  const formatDisplayDate = (dateStr: string) => {
-    if (!dateStr) return '날짜 미정';
-    const date = new Date(dateStr);
-    return `${date.getMonth() + 1}.${date.getDate()}(${['일','월','화','수','목','금','토'][date.getDay()]})`;
-  };
-
-  const calendarDays = useMemo(() => {
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const days = [];
-    const startOffset = firstDay.getDay(); 
-    for (let i = 0; i < startOffset; i++) days.push(null);
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      const d = new Date(year, month, i);
-      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      days.push({ day: i, iso, date: d });
-    }
-    return days;
-  }, [viewDate]);
-
-  const changeMonth = (offset: number) => {
-    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1));
-  };
-
-  const todayIso = new Date().toISOString().split('T')[0];
-
   if (activeTab === 'create') {
     return (
       <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-500 max-w-lg mx-auto overflow-hidden">
@@ -198,85 +161,6 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
               type="text" placeholder="TOUR TITLE" value={tourName} onChange={(e) => setTourName(e.target.value)}
               className="w-full bg-slate-50 border-none rounded-2xl px-6 py-5 text-slate-800 font-black text-xl focus:outline-none focus:bg-slate-100 transition-all placeholder:text-slate-200"
             />
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="text-[10px] font-black text-slate-200 uppercase tracking-[0.2em] px-2">Scheduled Date & Time</h3>
-            
-            <div className="space-y-3">
-              <button 
-                onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                className={`w-full bg-slate-50 rounded-2xl px-6 py-4 flex items-center justify-between text-left transition-all ${isCalendarOpen ? 'ring-2 ring-indigo-50' : ''}`}
-              >
-                <div className="flex items-center gap-3">
-                  <i className={`fa-regular fa-calendar text-sm ${tourDate ? 'text-indigo-600' : 'text-slate-300'}`}></i>
-                  <span className={`text-sm font-bold ${tourDate ? 'text-slate-800' : 'text-slate-300'}`}>
-                    {tourDate ? formatDisplayDate(tourDate) : '방문 날짜를 선택하세요 (선택)'}
-                  </span>
-                </div>
-                <i className={`fa-solid fa-chevron-down text-[10px] text-slate-300 transition-transform ${isCalendarOpen ? 'rotate-180' : ''}`}></i>
-              </button>
-
-              {isCalendarOpen && (
-                <div className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between mb-6 px-1">
-                    <span className="text-xs font-black text-slate-700">{viewDate.getFullYear()}.{viewDate.getMonth() + 1}</span>
-                    <div className="flex items-center gap-4">
-                      <button type="button" onClick={() => changeMonth(-1)} className="p-1 text-slate-300"><i className="fa-solid fa-chevron-left"></i></button>
-                      <button type="button" onClick={() => changeMonth(1)} className="p-1 text-slate-300"><i className="fa-solid fa-chevron-right"></i></button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-7 mb-4">
-                    {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
-                      <div key={d} className={`text-center text-[9px] font-black ${i === 0 ? 'text-red-400' : i === 6 ? 'text-indigo-400' : 'text-slate-300'}`}>{d}</div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-7 gap-y-2">
-                    {calendarDays.map((d, idx) => {
-                      if (!d) return <div key={`empty-${idx}`} />;
-                      const isToday = d.iso === todayIso;
-                      const isSelected = d.iso === tourDate;
-                      return (
-                        <button
-                          key={d.iso} type="button"
-                          onClick={() => { setTourDate(d.iso); setIsCalendarOpen(false); }}
-                          className={`aspect-square flex items-center justify-center rounded-full text-xs font-bold transition-all ${
-                            isSelected ? 'bg-indigo-600 text-white shadow-md' : isToday ? 'text-indigo-600 ring-1 ring-indigo-100' : 'text-slate-600 hover:bg-white'
-                          }`}
-                        >
-                          {d.day}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button 
-                    onClick={() => { setTourDate(''); setIsCalendarOpen(false); }}
-                    className="w-full mt-4 py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest"
-                  >
-                    날짜 선택 해제
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-2 -mx-1 px-1">
-                {HOURS_OPTIONS.map(hour => {
-                  const timeStr = `${String(hour).padStart(2, '0')}:00`;
-                  const isSelected = tourTime === timeStr;
-                  const ampm = hour < 12 ? '오전' : '오후';
-                  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-                  
-                  return (
-                    <button 
-                      key={hour}
-                      onClick={() => setTourTime(timeStr)}
-                      className={`flex-shrink-0 px-5 py-3 rounded-2xl font-black text-[10px] transition-all whitespace-nowrap ${isSelected ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-300'}`}
-                    >
-                      {ampm} {displayHour}시
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
           <div className="space-y-6">
@@ -428,7 +312,7 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
             DISCOVER
             {activeTab === 'list' && <div className="absolute -bottom-1 left-0 right-0 h-[3px] bg-slate-800 rounded-full" />}
           </button>
-          <button onClick={() => requireAuth(() => { resetForm(); setActiveTab('create'); })} className="pb-4 text-[11px] font-black text-indigo-600 relative transition-all tracking-widest">
+          <button onClick={() => requireAuth(() => setActiveTab('create'))} className="pb-4 text-[11px] font-black text-indigo-600 relative transition-all tracking-widest">
             CREATE +
           </button>
         </div>
@@ -447,15 +331,10 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
                     <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest">
                       {isCreator ? 'MY TOUR' : (tour.userName || 'ANONYMOUS')}
                     </p>
-                    {tour.tourDate && (
-                      <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-md">
-                        {formatDisplayDate(tour.tourDate)} {tour.tourTime?.split(':')[0]}시
-                      </span>
-                    )}
                     {isCreator && (
                       <div className="flex items-center gap-2 ml-auto">
                         <button 
-                          onClick={(e) => { e.stopPropagation(); onEditStarted?.(); setEditingTourId(tour.id); setTourName(tour.title); setTourStops(tour.steps || []); setTourDate(tour.tourDate || ''); setTourTime(tour.tourTime || '14:00'); setActiveTab('create'); }}
+                          onClick={(e) => { e.stopPropagation(); onEditStarted?.(); setEditingTourId(tour.id); setTourName(tour.title); setTourStops(tour.steps || []); setActiveTab('create'); }}
                           className="text-[9px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-tighter"
                         >
                           EDIT
@@ -474,7 +353,8 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-4 mb-4 px-1">
+              {/* 투어 코스 정보 직접 노출 */}
+              <div className="space-y-4 mb-10 px-1">
                 <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Tour Course</p>
                 <div className="relative pl-6 space-y-6">
                   <div className="absolute left-[7.5px] top-2 bottom-2 w-[1.5px] bg-slate-200 border-l border-dashed border-slate-300"></div>
@@ -503,12 +383,17 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
                   })}
                 </div>
               </div>
+
+              <button onClick={() => onCreateMeeting(tour.id, tour.title)} className="w-full py-4.5 bg-slate-800 text-white rounded-2xl text-[11px] font-black active:scale-95 transition-all uppercase tracking-widest shadow-lg flex items-center justify-center gap-2">
+                <i className="fa-solid fa-users text-[10px]"></i>
+                CREATE MEETING WITH THIS TOUR
+              </button>
             </div>
           );
         }) : (
           <div className="py-40 text-center flex flex-col items-center opacity-30 grayscale">
             <i className="fa-solid fa-compass text-5xl mb-6"></i>
-            <p className="text-[11px] font-black uppercase tracking-widest italic">Explore the city solo</p>
+            <p className="text-[11px] font-black uppercase tracking-widest italic">Explore the city together</p>
           </div>
         )}
       </main>

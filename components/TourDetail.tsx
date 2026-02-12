@@ -262,9 +262,9 @@ const TourDetail: React.FC<TourDetailProps> = ({
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-slate-50/80 backdrop-blur-md max-w-lg mx-auto z-40 border-t border-slate-100">
         <button 
           onClick={() => onCreateMeeting(tour.id, tour.title)}
-          className="w-full py-5 bg-indigo-600 text-white font-black rounded-3xl shadow-2xl transition-all active:scale-95"
+          className="w-full py-5 bg-slate-800 text-white font-black rounded-3xl shadow-2xl transition-all active:scale-95 uppercase tracking-widest text-[11px]"
         >
-          이 투어로 모임 만들기
+          CREATE MEETING WITH THIS TOUR
         </button>
       </div>
     </div>

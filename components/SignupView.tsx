@@ -2,11 +2,11 @@
 import React, { useState } from 'react';
 
 interface SignupViewProps {
-  phoneNumber: string;
-  onSignupComplete: (userData: { name: string; phoneNumber: string }) => void;
+  email: string;
+  onSignupComplete: (userData: { name: string; email: string }) => void;
 }
 
-export default function SignupView({ phoneNumber, onSignupComplete }: SignupViewProps) {
+export default function SignupView({ email, onSignupComplete }: SignupViewProps) {
   const [nickname, setNickname] = useState('');
   const [agreed, setAgreed] = useState({
     terms: false,
@@ -38,7 +38,7 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
     if (isProfileValid) {
       onSignupComplete({
         name: nickname.trim(),
-        phoneNumber: phoneNumber,
+        email: email,
       });
     }
   };
@@ -46,27 +46,27 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
   return (
     <div className="min-h-screen bg-white flex flex-col p-8 max-w-lg mx-auto animate-in fade-in duration-500">
       <div className="mb-12 mt-12">
-        <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-indigo-100">
+        <div className="w-14 h-14 bg-teal-500 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-teal-100">
           <i className="fa-solid fa-user-plus text-xl"></i>
         </div>
         <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
           반가워요!<br/>
           프로필을 설정해 주세요
         </h1>
-        <p className="text-sm text-slate-400 mt-2 font-medium">
-          가입된 휴대폰 번호: {phoneNumber}
+        <p className="text-[10px] text-slate-400 mt-3 font-black uppercase tracking-widest">
+          CONNECTED EMAIL: <span className="text-teal-500">{email}</span>
         </p>
       </div>
 
       <div className="space-y-10 flex-1 animate-in slide-in-from-bottom-4 duration-500">
         <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2">닉네임</label>
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2">활동 닉네임</label>
           <input 
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder="한글/영어 2~10자"
-            className={`w-full px-6 py-5 bg-slate-50 border rounded-3xl font-bold text-sm focus:outline-none focus:ring-4 transition-all ${nickname && validateNickname(nickname) ? 'border-red-200 ring-red-50' : 'border-slate-50 focus:ring-indigo-50 focus:bg-white'}`}
+            className={`w-full px-6 py-5 bg-slate-50 border rounded-3xl font-bold text-sm focus:outline-none focus:ring-4 transition-all ${nickname && validateNickname(nickname) ? 'border-red-200 ring-red-50' : 'border-slate-50 focus:ring-teal-100/30 focus:bg-white'}`}
           />
           {nickname && validateNickname(nickname) && (
             <p className="text-[10px] font-bold text-red-500 ml-2 mt-2">{validateNickname(nickname)}</p>
@@ -77,12 +77,12 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
           <div className="flex items-center justify-between px-2 mb-1">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">약관 동의</h3>
             <label className="flex items-center gap-2 cursor-pointer group">
-              <span className="text-[10px] font-black text-slate-300 group-hover:text-indigo-600 transition-colors">전체 동의하기</span>
+              <span className="text-[10px] font-black text-slate-300 group-hover:text-teal-600 transition-colors">전체 동의하기</span>
               <input 
                 type="checkbox"
                 checked={agreed.terms && agreed.privacy}
                 onChange={(e) => handleAllAgree(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-200 text-indigo-600 focus:ring-indigo-500 transition-all"
+                className="w-4 h-4 rounded border-slate-200 text-teal-600 focus:ring-teal-500 transition-all"
               />
             </label>
           </div>
@@ -93,7 +93,7 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
                 type="checkbox"
                 checked={agreed.terms}
                 onChange={(e) => setAgreed({ ...agreed, terms: e.target.checked })}
-                className="w-5 h-5 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500 transition-all"
+                className="w-5 h-5 rounded-lg border-slate-200 text-teal-600 focus:ring-teal-500 transition-all"
               />
               <span className="text-xs font-bold text-slate-600">서비스 이용약관 동의 (필수)</span>
             </label>
@@ -102,7 +102,7 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
                 type="checkbox"
                 checked={agreed.privacy}
                 onChange={(e) => setAgreed({ ...agreed, privacy: e.target.checked })}
-                className="w-5 h-5 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500 transition-all"
+                className="w-5 h-5 rounded-lg border-slate-200 text-teal-600 focus:ring-teal-500 transition-all"
               />
               <span className="text-xs font-bold text-slate-600">개인정보 수집 및 이용 동의 (필수)</span>
             </label>
@@ -113,13 +113,10 @@ export default function SignupView({ phoneNumber, onSignupComplete }: SignupView
           <button 
             onClick={handleComplete}
             disabled={!isProfileValid}
-            className="w-full py-5 bg-indigo-600 text-white font-black rounded-[2rem] shadow-xl shadow-indigo-100 active:scale-[0.98] transition-all text-sm disabled:bg-slate-200 disabled:shadow-none mb-6"
+            className="w-full py-5 bg-teal-500 text-white font-black rounded-[2rem] shadow-xl shadow-teal-100 active:scale-[0.98] transition-all text-sm disabled:bg-slate-200 disabled:shadow-none mb-6"
           >
             가입 완료
           </button>
-          <p className="text-[10px] font-bold text-slate-300 leading-relaxed text-center">
-            서비스 이용을 위해 최소한의 정보(휴대폰 번호)만 수집합니다.
-          </p>
         </div>
       </div>
     </div>

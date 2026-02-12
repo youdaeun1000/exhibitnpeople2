@@ -5,9 +5,9 @@ import { ExhibitionData, SortType } from '../types';
 interface ExhibitionListProps {
   exhibitions: ExhibitionData[];
   onSelect: (exhibition: ExhibitionData) => void;
-  onJoinMeeting: (exhibition: ExhibitionData) => void;
   likedIds: Set<string>;
   onLikeToggle: (id: string) => void;
+  onJoinMeetingClick: (id: string, title: string) => void;
   currentUserId: string;
 }
 
@@ -20,9 +20,9 @@ interface ArtZone {
 const ExhibitionList: React.FC<ExhibitionListProps> = ({ 
   exhibitions, 
   onSelect, 
-  onJoinMeeting,
   likedIds, 
-  onLikeToggle
+  onLikeToggle,
+  onJoinMeetingClick
 }) => {
   const [sortBy, setSortBy] = useState<SortType>('closing');
   const [searchQuery, setSearchQuery] = useState('');
@@ -103,10 +103,7 @@ const ExhibitionList: React.FC<ExhibitionListProps> = ({
 
   const renderExhibitionCard = (ex: ExhibitionData, showFullInfo = true) => (
     <div key={ex.id} className="group relative">
-      <div 
-        onClick={() => onSelect(ex)}
-        className="cursor-pointer mb-6"
-      >
+      <div className="cursor-default mb-8">
         <div className="flex justify-between items-start mb-6">
           <div className="flex-1 pr-14">
             <div className="flex items-center gap-2 mb-3">
@@ -127,7 +124,7 @@ const ExhibitionList: React.FC<ExhibitionListProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 mb-4">
+        <div className="grid grid-cols-1 gap-4 mb-8">
           <div className="flex items-start gap-4">
             <div className="w-1.5 h-1.5 bg-slate-200 rounded-full mt-1.5"></div>
             <div>
@@ -144,6 +141,7 @@ const ExhibitionList: React.FC<ExhibitionListProps> = ({
                 ) : (
                   <p className="text-xs font-bold text-slate-400">정보 없음</p>
                 )}
+                {ex.region && <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase italic tracking-tight">{ex.region}</p>}
               </div>
             </div>
           </div>
@@ -161,20 +159,19 @@ const ExhibitionList: React.FC<ExhibitionListProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={() => onJoinMeetingClick(ex.id, ex.title)} 
+          className="flex-1 py-4.5 bg-slate-800 text-white rounded-2xl text-[11px] font-black active:opacity-90 transition-all uppercase tracking-widest shadow-lg shadow-slate-100"
+        >
+          JOIN MEETING
+        </button>
         <a 
           href={ex.representativeLink} target="_blank" rel="noopener noreferrer" 
-          className="w-full py-4.5 bg-slate-50 text-slate-400 border border-slate-100 rounded-2xl text-[10px] font-black active:opacity-70 transition-all uppercase tracking-widest text-center flex items-center justify-center"
+          className="px-8 py-4.5 bg-slate-50 text-slate-600 rounded-2xl text-[10px] font-black active:bg-slate-100 transition-all uppercase tracking-widest"
         >
           INFO
         </a>
-        <button 
-          onClick={(e) => { e.stopPropagation(); onJoinMeeting(ex); }}
-          className="w-full py-4.5 bg-slate-800 text-white rounded-2xl text-[10px] font-black active:scale-[0.98] transition-all uppercase tracking-widest shadow-lg shadow-slate-100 flex items-center justify-center gap-2"
-        >
-          <span>JOIN MEETING</span>
-          <i className="fa-solid fa-arrow-right text-[8px] opacity-50"></i>
-        </button>
       </div>
       
       {isClosingSoon(ex.endDate) && (

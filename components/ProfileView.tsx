@@ -29,6 +29,8 @@ interface ProfileViewProps {
   onRoleChange?: (newRole: UserRole) => void;
 }
 
+type TabType = 'schedule' | 'created-meetings' | 'liked';
+
 export default function ProfileView({
   userId,
   userName,
@@ -37,17 +39,23 @@ export default function ProfileView({
   role,
   isMe,
   likedExhibitionIds,
+  meetings,
+  tours,
   allExhibitions,
   onBack,
   onBlockToggle,
   onReport,
+  onSelectMeeting,
+  onSelectTour,
   onSelectExhibition,
+  onSelectUser,
   onGoSettings,
   onNicknameChange,
   onInstagramUrlChange,
   onBioChange,
   onRoleChange
 }: ProfileViewProps) {
+  const [activeTab, setActiveTab] = useState<TabType>(isMe ? 'schedule' : 'created-meetings');
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [editName, setEditName] = useState(userName);
@@ -78,6 +86,21 @@ export default function ProfileView({
   };
 
   const instaUsername = getInstaUsername(instagramUrl);
+
+  const isMeetingPast = (meetingDate: string, meetingTime: string) => {
+    const meetingDateTime = new Date(`${meetingDate}T${meetingTime}`);
+    return meetingDateTime < new Date();
+  };
+
+  const { upcomingMeetings } = useMemo(() => {
+    if (!isMe) return { upcomingMeetings: [] };
+    const myMeetings = meetings.filter(m => m.creatorId === userId || m.participants.some(p => p.userId === userId && p.status === 'accepted'));
+    const upcoming = myMeetings.filter(m => !isMeetingPast(m.meetingDate, m.meetingTime)).sort((a,b) => new Date(`${a.meetingDate}T${a.meetingTime}`).getTime() - new Date(`${b.meetingDate}T${b.meetingTime}`).getTime());
+    return { upcomingMeetings: upcoming };
+  }, [meetings, userId, isMe]);
+
+  // 직접 만든 모임 중에서도 지난 날짜는 제외
+  const createdMeetings = meetings.filter(m => m.creatorId === userId && !isMeetingPast(m.meetingDate, m.meetingTime));
   const likedExhibitions = allExhibitions.filter(ex => likedExhibitionIds.has(ex.id));
 
   const handleProfileSubmit = () => {
@@ -130,6 +153,7 @@ export default function ProfileView({
 
         <div className="mb-14">
           <div className="flex flex-col items-center text-center">
+            {/* 상단 프로필 이미지 (역할 아이콘) */}
             <div className="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center text-white text-3xl mb-6 shadow-xl shadow-slate-100 ring-4 ring-white">
               <i className={`fa-solid ${currentRoleInfo.icon}`}></i>
             </div>
@@ -144,6 +168,7 @@ export default function ProfileView({
             
             {bio && <p className="text-sm font-medium text-slate-400 mb-6 leading-relaxed max-w-[280px]">{bio}</p>}
 
+            {/* 인스타그램 링크 한 줄 배치 */}
             {instagramUrl && (
               <a 
                 href={instagramUrl} 
@@ -159,30 +184,83 @@ export default function ProfileView({
         </div>
 
         <div className="flex gap-10 mb-10 px-2 overflow-x-auto no-scrollbar border-b border-slate-50">
-          <button className={`pb-4 text-[10px] font-black tracking-[0.15em] relative transition-all flex items-center gap-1.5 text-slate-800`}>
-            {isMe && <i className="fa-solid fa-lock text-[8px] opacity-40"></i>}
-            LIKED EXHIBITS
-            <div className="absolute -bottom-0.5 left-0 right-0 h-[2.5px] bg-slate-800 rounded-full" />
+          {isMe && (
+            <button onClick={() => setActiveTab('schedule')} className={`pb-4 text-[10px] font-black tracking-[0.15em] relative transition-all flex items-center gap-1.5 ${activeTab === 'schedule' ? 'text-slate-800' : 'text-slate-200'}`}>
+              <i className="fa-solid fa-lock text-[8px] opacity-40"></i>
+              PLAN
+              {activeTab === 'schedule' && <div className="absolute -bottom-0.5 left-0 right-0 h-[2.5px] bg-slate-800 rounded-full" />}
+            </button>
+          )}
+          <button onClick={() => setActiveTab('created-meetings')} className={`pb-4 text-[10px] font-black tracking-[0.15em] relative transition-all ${activeTab === 'created-meetings' ? 'text-slate-800' : 'text-slate-200'}`}>
+            MINE
+            {activeTab === 'created-meetings' && <div className="absolute -bottom-0.5 left-0 right-0 h-[2.5px] bg-slate-800 rounded-full" />}
           </button>
+          {isMe && (
+            <button onClick={() => setActiveTab('liked')} className={`pb-4 text-[10px] font-black tracking-[0.15em] relative transition-all flex items-center gap-1.5 ${activeTab === 'liked' ? 'text-slate-800' : 'text-slate-200'}`}>
+              <i className="fa-solid fa-lock text-[8px] opacity-40"></i>
+              LIKED
+              {activeTab === 'liked' && <div className="absolute -bottom-0.5 left-0 right-0 h-[2.5px] bg-slate-800 rounded-full" />}
+            </button>
+          )}
         </div>
 
         <div className="pb-40 px-2">
-          <div className="space-y-12">
-            {likedExhibitions.length > 0 ? likedExhibitions.map(ex => (
-              <div key={ex.id} onClick={() => onSelectExhibition(ex)} className="group cursor-pointer active:opacity-60 transition-all">
-                <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3">{ex.artist}</p>
-                <h4 className="text-xl font-black text-slate-800 tracking-tight mb-4">{ex.title}</h4>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-slate-200 italic uppercase">EXHIBIT ENDS {ex.endDate}</p>
-                  <i className="fa-solid fa-arrow-right text-[10px] text-slate-200 group-hover:translate-x-1 transition-transform"></i>
+          {isMe && activeTab === 'schedule' && (
+            <div className="space-y-10">
+              {upcomingMeetings.length > 0 ? upcomingMeetings.map(m => (
+                <div key={m.id} onClick={() => onSelectMeeting(m.id)} className="group active:opacity-60 transition-opacity cursor-pointer">
+                  <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3">{m.meetingDate} · {m.meetingTime}</p>
+                  <h4 className="font-black text-slate-800 text-xl tracking-tight mb-3 truncate">{m.title}</h4>
+                  <p className="text-xs font-bold text-slate-300 italic truncate">{m.location}</p>
                 </div>
-              </div>
-            )) : (
-              <div className="py-20 text-center flex flex-col items-center opacity-40">
-                <p className="text-[10px] font-black text-slate-200 uppercase tracking-widest italic">NO LIKES YET</p>
-              </div>
-            )}
-          </div>
+              )) : (
+                <div className="py-20 text-center flex flex-col items-center">
+                   <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                    <i className="fa-solid fa-calendar text-slate-100 text-xl"></i>
+                  </div>
+                  <p className="text-[10px] font-black text-slate-200 uppercase tracking-[0.2em]">NO SCHEDULED MEETINGS</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'created-meetings' && (
+            <div className="space-y-8">
+              {createdMeetings.length > 0 ? createdMeetings.map(m => (
+                <div key={m.id} className="bg-slate-50 p-8 rounded-[2.5rem] active:scale-[0.98] transition-all cursor-pointer" onClick={() => onSelectMeeting(m.id)}>
+                  <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3">{m.meetingDate}</p>
+                  <h4 className="font-black text-slate-800 text-lg tracking-tight mb-8 truncate">{m.title}</h4>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-300 italic truncate max-w-[140px]">{m.location}</span>
+                    <span className="text-xs font-black text-slate-800">{m.participants.length+1}/{m.maxParticipants}</span>
+                  </div>
+                </div>
+              )) : (
+                <div className="py-20 text-center flex flex-col items-center opacity-40">
+                  <p className="text-[10px] font-black text-slate-200 uppercase tracking-widest italic">NOTHING TO SHOW</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isMe && activeTab === 'liked' && (
+            <div className="space-y-12">
+              {likedExhibitions.length > 0 ? likedExhibitions.map(ex => (
+                <div key={ex.id} onClick={() => onSelectExhibition(ex)} className="group cursor-pointer active:opacity-60 transition-all">
+                  <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3">{ex.artist}</p>
+                  <h4 className="text-xl font-black text-slate-800 tracking-tight mb-4">{ex.title}</h4>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-slate-200 italic uppercase">EXHIBIT ENDS {ex.endDate}</p>
+                    <i className="fa-solid fa-arrow-right text-[10px] text-slate-200 group-hover:translate-x-1 transition-transform"></i>
+                  </div>
+                </div>
+              )) : (
+                <div className="py-20 text-center flex flex-col items-center opacity-40">
+                  <p className="text-[10px] font-black text-slate-200 uppercase tracking-widest italic">NO LIKES YET</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
