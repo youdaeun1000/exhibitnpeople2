@@ -64,6 +64,7 @@ export type ViewType =
   | 'chat' 
   | 'profile' 
   | 'meeting-create' 
+  | 'meeting-edit'
   | 'chat-room' 
   | 'user-profile' 
   | 'settings' 

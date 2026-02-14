@@ -16,6 +16,8 @@ interface MeetingDetailProps {
   onJoinRequest?: () => void;
   onSelectUser: (userId: string) => void;
   onKickParticipant?: (userId: string) => void;
+  onEditMeeting?: (meeting: Meeting) => void;
+  onDeleteMeeting?: (meetingId: string) => void;
 }
 
 const MeetingDetail: React.FC<MeetingDetailProps> = ({ 
@@ -28,7 +30,9 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
   currentUserId,
   onJoinRequest,
   onSelectUser,
-  onKickParticipant
+  onKickParticipant,
+  onEditMeeting,
+  onDeleteMeeting
 }) => {
   const isMember = meeting.creatorId === currentUserId || meeting.participants.some(p => p.userId === currentUserId && p.status === 'accepted');
   const isPending = meeting.participants.some(p => p.userId === currentUserId && p.status === 'pending');
@@ -65,8 +69,26 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
     <div className="min-h-screen bg-white pb-40 animate-in slide-in-from-right duration-500">
       <div className={`fixed top-0 left-0 right-0 h-[80px] px-8 flex items-center justify-between z-50 max-w-lg mx-auto bg-white/80 backdrop-blur-xl transition-transform duration-500 ${isHeaderVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <button onClick={onBack} className="w-11 h-11 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 active:scale-90 transition-all"><i className="fa-solid fa-chevron-left"></i></button>
-        <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Meeting Detail</h2>
-        <div className="w-11"></div>
+        <div className="flex items-center gap-3">
+          {isHost && (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => onEditMeeting?.(meeting)}
+                className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black active:scale-95 transition-all"
+              >
+                EDIT
+              </button>
+              <button 
+                onClick={() => { if(window.confirm('모임을 정말 삭제하시겠습니까?')) onDeleteMeeting?.(meeting.id); }}
+                className="px-4 py-2 bg-red-50 text-red-500 rounded-xl text-[10px] font-black active:scale-95 transition-all"
+              >
+                DELETE
+              </button>
+            </div>
+          )}
+          {!isHost && <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Meeting Detail</h2>}
+        </div>
+        {!isHost && <div className="w-11"></div>}
       </div>
 
       <div className="pt-28 px-8 space-y-12">

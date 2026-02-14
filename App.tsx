@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<ViewType[]>([]);
   const [selectedExhibitionId, setSelectedExhibitionId] = useState<string | null>(null);
   const [editingExhibitionId, setEditingExhibitionId] = useState<string | null>(null);
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
   const [pendingEditTour, setPendingEditTour] = useState<Tour | null>(null);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [selectedExhibitionForMeetings, setSelectedExhibitionForMeetings] = useState<{id: string, title: string} | null>(null);
@@ -642,6 +643,29 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteMeeting = async (meetingId: string) => {
+    setIsSaving(true);
+    setSavingMessage('모임을 삭제하는 중입니다...');
+    try {
+      await deleteDoc(doc(db, "meetings", meetingId));
+      await deleteDoc(doc(db, "chats", meetingId));
+      alert('모임이 정상적으로 삭제되었습니다.');
+      await fetchMeetings();
+      setCurrentView('meeting');
+      setHistory([]);
+    } catch (error) {
+      console.error("Meeting Delete Error:", error);
+      alert('모임 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditMeeting = (meeting: Meeting) => {
+    setEditingMeetingId(meeting.id);
+    navigateTo('meeting-edit');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title) { alert('전시 제목을 입력해 주세요.'); return; }
@@ -740,7 +764,7 @@ const App: React.FC = () => {
     );
   }
 
-  const shouldShowHeader = !isTourCreating && !['exhibition-detail', 'meeting-detail', 'meeting-create', 'chat-room', 'user-profile', 'register', 'settings', 'blocked-management', 'withdrawal-guide', 'report-guide', 'customer-service', 'exhibition-meetings'].includes(currentView);
+  const shouldShowHeader = !isTourCreating && !['exhibition-detail', 'meeting-detail', 'meeting-create', 'meeting-edit', 'chat-room', 'user-profile', 'register', 'settings', 'blocked-management', 'withdrawal-guide', 'report-guide', 'customer-service', 'exhibition-meetings'].includes(currentView);
   const shouldShowBottomNav = !isTourCreating && ['list', 'mytour', 'meeting', 'chat', 'profile'].includes(currentView);
 
   return (
@@ -793,6 +817,8 @@ const App: React.FC = () => {
             onJoinRequest={() => handleJoinRequest(selectedMeetingId)} 
             onSelectUser={handleUserClick} 
             onKickParticipant={(uid) => handleKickParticipant(selectedMeetingId, uid)} 
+            onEditMeeting={handleEditMeeting}
+            onDeleteMeeting={handleDeleteMeeting}
           />
         ) : currentView === 'chat' ? (
           <ChatList rooms={chatRooms} meetings={meetings} onSelectRoom={(id) => { setSelectedMeetingId(id); navigateTo('chat-room'); }} onLeaveChat={handleLeaveChat} />
@@ -817,6 +843,13 @@ const App: React.FC = () => {
           <ExhibitionMeetingsView exhibitionId={selectedExhibitionForMeetings.id} exhibitionTitle={selectedExhibitionForMeetings.title} meetings={meetings} currentUserId={currentUser.id} onBack={goBack} onSelectMeeting={handleMeetingSelect} onCreateNew={() => { setMeetingContext({ id: selectedExhibitionForMeetings.id, title: selectedExhibitionForMeetings.title, type: 'exhibition', location: exhibitions.find(e => e.id === selectedExhibitionForMeetings.id)?.region || '' }); navigateTo('meeting-create'); }} onSelectUser={handleUserClick} />
         ) : currentView === 'meeting-create' && meetingContext ? (
           <MeetingCreate context={meetingContext} onBack={goBack} onCreated={(m) => { fetchMeetings(); setCurrentView('meeting'); setHistory([]); }} currentUserId={currentUser.id} />
+        ) : currentView === 'meeting-edit' && editingMeetingId ? (
+          <MeetingCreate 
+            initialMeeting={meetings.find(m => m.id === editingMeetingId)} 
+            onBack={goBack} 
+            onCreated={(m) => { fetchMeetings(); setCurrentView('meeting-detail'); setEditingMeetingId(null); }} 
+            currentUserId={currentUser.id} 
+          />
         ) : currentView === 'chat-room' && selectedMeetingId ? (
           <ChatRoom meetingId={selectedMeetingId} meeting={meetings.find(m => m.id === selectedMeetingId)!} allExhibitions={exhibitions} allTours={createdTours} messages={messages.filter(msg => msg.meetingId === selectedMeetingId)} onBack={goBack} onSelectExhibition={handleExhibitionSelect} onSelectTour={(tour) => {}} onSelectMeeting={handleMeetingSelect} onSendMessage={handleSendMessage} currentUserId={currentUser.id} onSelectUser={handleUserClick} />
         ) : currentView === 'register' ? (

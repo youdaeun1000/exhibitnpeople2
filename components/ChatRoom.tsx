@@ -95,18 +95,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({
             <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
               {showName && !isMe && (
                 <span 
-                  className="text-[9px] font-black text-slate-400 mb-1.5 ml-1 cursor-pointer active:opacity-60 transition-opacity"
+                  className="text-[11px] font-black text-slate-400 mb-1.5 ml-1 cursor-pointer active:opacity-60 transition-opacity"
                   onClick={() => onSelectUser(msg.senderId)}
                 >
                   {msg.senderName}
                 </span>
               )}
-              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-xs font-medium shadow-sm leading-relaxed ${
+              <div className={`max-w-[80%] px-5 py-3 rounded-[1.5rem] text-[15px] font-semibold shadow-sm leading-relaxed ${
                 isMe ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none border border-slate-100'
               }`}>
                 {msg.text}
               </div>
-              <span className="text-[8px] text-slate-300 mt-1 px-1">
+              <span className="text-[10px] text-slate-300 mt-1 px-1">
                 {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
@@ -129,7 +129,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="메시지를 입력하세요..."
-            className="flex-1 bg-transparent px-4 py-2 text-xs font-bold focus:outline-none"
+            className="flex-1 bg-transparent px-4 py-2 text-sm font-bold focus:outline-none"
           />
           <button 
             onClick={handleSend}
