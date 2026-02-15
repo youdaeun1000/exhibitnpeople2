@@ -351,12 +351,9 @@ const App: React.FC = () => {
         alert("정원이 초과되어 신청할 수 없습니다.");
         return;
       }
-      const answer = window.prompt(meeting.question || "참가 신청 답변을 입력해주세요.");
-      if (answer === null) return;
-      if (!answer.trim()) {
-        alert("답변을 입력해야 신청이 가능합니다.");
-        return;
-      }
+      
+      if (!window.confirm("이 모임에 참여 신청을 하시겠습니까?")) return;
+      
       setIsSaving(true);
       setSavingMessage("참가 신청을 처리하고 있습니다...");
       try {

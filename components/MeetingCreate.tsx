@@ -22,7 +22,6 @@ const MeetingCreate: React.FC<MeetingCreateProps> = ({ context, initialMeeting, 
     (context?.type === 'tour' ? context.title : `${context?.title || ''} 모임`)
   );
   const [maxParticipants, setMaxParticipants] = useState(initialMeeting?.maxParticipants || 4);
-  const [question, setQuestion] = useState(initialMeeting?.question || '');
   const [meetingDate, setMeetingDate] = useState(initialMeeting?.meetingDate || new Date().toISOString().split('T')[0]);
   const [selectedHour, setSelectedHour] = useState<number | null>(
     initialMeeting ? parseInt(initialMeeting.meetingTime.split(':')[0]) : 14
@@ -89,7 +88,7 @@ const MeetingCreate: React.FC<MeetingCreateProps> = ({ context, initialMeeting, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (title.trim() && question.trim() && meetingDate && selectedHour !== null && location.trim()) {
+    if (title.trim() && meetingDate && selectedHour !== null && location.trim()) {
       if (!isEdit && isHourDisabled(meetingDate, selectedHour)) {
         alert("모임은 현재 시각 기준 최소 3시간 이후부터 개설할 수 있습니다.");
         return;
@@ -102,7 +101,7 @@ const MeetingCreate: React.FC<MeetingCreateProps> = ({ context, initialMeeting, 
           meetingDate: Timestamp.fromDate(dateObj),
           meetingPlace: location.trim(),
           maxParticipants,
-          question: question.trim(),
+          question: "", // 참가 질문 항목 제거됨
           updatedAt: serverTimestamp()
         };
 
@@ -119,7 +118,7 @@ const MeetingCreate: React.FC<MeetingCreateProps> = ({ context, initialMeeting, 
             meetingDate,
             meetingTime: `${String(selectedHour).padStart(2, '0')}:00`,
             maxParticipants,
-            question: question.trim()
+            question: ""
           });
         } else if (context) {
           meetingData.targetId = context.id;
@@ -147,7 +146,7 @@ const MeetingCreate: React.FC<MeetingCreateProps> = ({ context, initialMeeting, 
             meetingDate,
             meetingTime: `${String(selectedHour).padStart(2, '0')}:00`,
             maxParticipants,
-            question: question.trim(),
+            question: "",
             isApprovalRequired: true,
             creatorId: currentUserId,
             creatorName: '본인', 
@@ -185,7 +184,7 @@ const MeetingCreate: React.FC<MeetingCreateProps> = ({ context, initialMeeting, 
   };
 
   const todayIso = new Date().toISOString().split('T')[0];
-  const isFormValid = title.trim() && question.trim() && meetingDate && selectedHour !== null && !isHourDisabled(meetingDate, selectedHour) && location.trim() && !isSubmitting;
+  const isFormValid = title.trim() && meetingDate && selectedHour !== null && !isHourDisabled(meetingDate, selectedHour) && location.trim() && !isSubmitting;
 
   return (
     <div className="min-h-screen bg-slate-50 animate-in slide-in-from-right duration-300">
@@ -323,15 +322,6 @@ const MeetingCreate: React.FC<MeetingCreateProps> = ({ context, initialMeeting, 
                 </button>
               ))}
             </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1">참가 질문</label>
-            <textarea 
-              value={question} onChange={(e) => setQuestion(e.target.value)}
-              placeholder="예: 좋아하는 화가나 작품이 있으신가요?"
-              className="w-full px-5 py-4 bg-white border border-slate-100 rounded-3xl font-bold text-sm min-h-[120px] shadow-sm focus:ring-4 focus:ring-indigo-100 focus:outline-none transition-all leading-relaxed placeholder:text-slate-300"
-            />
           </div>
 
           <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent max-w-lg mx-auto z-40">
