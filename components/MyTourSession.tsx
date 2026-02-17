@@ -121,7 +121,11 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
   };
 
   const handleAddTeaTime = () => {
-    setTourStops([...tourStops, { id: Date.now().toString(), type: 'teatime' }]);
+    setTourStops([...tourStops, { id: Date.now().toString(), type: 'teatime', memo: '' }]);
+  };
+
+  const handleUpdateMemo = (id: string, memo: string) => {
+    setTourStops(tourStops.map(s => s.id === id ? { ...s, memo } : s));
   };
 
   const handleDragStart = (index: number) => {
@@ -198,7 +202,7 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
                       <p className="text-[11px] font-black text-slate-800 truncate">
                         {stop.type === 'exhibition' ? (ex?.title || 'Unknown Exhibition') : 'Tea Time & Break'}
                       </p>
-                      {stop.type === 'exhibition' && (
+                      {stop.type === 'exhibition' ? (
                         <div className="flex items-center gap-2">
                           <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest truncate">{ex?.galleryName || ex?.artist}</p>
                           {ex?.region && (
@@ -207,6 +211,14 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
                             </span>
                           )}
                         </div>
+                      ) : (
+                        <input 
+                          type="text"
+                          placeholder="간단한 메모 (예: 식사, 카페)"
+                          value={stop.memo || ''}
+                          onChange={(e) => handleUpdateMemo(stop.id, e.target.value)}
+                          className="w-full bg-white border-none rounded-lg px-2 py-1 text-[10px] font-bold text-amber-600 focus:ring-1 focus:ring-amber-200 outline-none mt-1 placeholder:text-amber-200"
+                        />
                       )}
                     </div>
                     
@@ -376,6 +388,7 @@ const MyTourSession: React.FC<MyTourSessionProps> = ({
                           <div className="absolute -left-[18.5px] w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-white shadow-sm ring-4 ring-slate-50 transition-transform group-hover/stop:scale-125"></div>
                           <div className="flex-1">
                             <p className="text-xs font-black text-amber-700 uppercase">Tea Time & Break</p>
+                            {step.memo && <p className="text-[10px] font-bold text-amber-500 italic mt-0.5">{step.memo}</p>}
                           </div>
                         </div>
                       );

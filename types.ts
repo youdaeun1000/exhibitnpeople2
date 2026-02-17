@@ -51,6 +51,7 @@ export interface TourStop {
   id: string;
   type: 'exhibition' | 'teatime';
   exhibitionId?: string;
+  memo?: string; // 추가: 티타임 메모
 }
 
 export type ViewType = 

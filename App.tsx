@@ -6,7 +6,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import FormSection from './components/FormSection';
-import OperatingHoursForm from './components/OperatingHoursForm';
 import ExhibitionList from './components/ExhibitionList';
 import ExhibitionDetail from './components/ExhibitionDetail';
 import MyTourSession from './components/MyTourSession';
@@ -31,7 +30,7 @@ import { DUMMY_EXHIBITIONS, DUMMY_USERS, DAYS, REGIONS } from './constants';
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [pendingUser, setPendingUser] = useState<{uid: string, email: string, name: string} | null>(null);
+  const [pendingUser, setPendingUser] = useState<{uid: string, email: string | null, name: string, phoneNumber: string | null} | null>(null);
   const [showLoginOverlay, setShowLoginOverlay] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savingMessage, setSavingMessage] = useState('정보를 처리하고 있습니다...');
@@ -49,6 +48,7 @@ const App: React.FC = () => {
     id: '',
     name: '익명',
     email: '',
+    phoneNumber: null as string | null,
     instagramUrl: null as string | null,
     bio: null as string | null,
     role: 'Viewer' as UserRole,
@@ -68,7 +68,6 @@ const App: React.FC = () => {
   const [tourExhibitionIds, setTourExhibitionIds] = useState<string[]>([]);
   const [createdTours, setCreatedTours] = useState<Tour[]>([]);
 
-  // For Reporting
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{id: string, name: string} | null>(null);
 
@@ -78,8 +77,6 @@ const App: React.FC = () => {
     artist: '',
     startDate: '',
     endDate: '',
-    selectedDays: [...DAYS],
-    closingNote: '',
     galleryName: '',
     region: '삼청/인사'
   });
@@ -228,6 +225,7 @@ const App: React.FC = () => {
         setCurrentUser(prev => ({ 
           ...prev, 
           name: data.nickname || data.name || '알 수 없음',
+          phoneNumber: data.phoneNumber || null,
           instagramUrl: data.instagramUrl || null,
           bio: data.bio || null,
           role: data.role || 'Viewer'
@@ -268,27 +266,6 @@ const App: React.FC = () => {
   const handleMeetingSelect = (id: string) => {
     setSelectedMeetingId(id);
     navigateTo('meeting-detail');
-  };
-
-  const formatDayList = (dayList: DayOfWeek[]) => {
-    if (dayList.length === 0) return '';
-    if (dayList.length === 7) return '매일';
-    const sortedDays = [...dayList].sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
-    const dayIndices = sortedDays.map(d => DAYS.indexOf(d));
-    const segments: string[] = [];
-    let start = dayIndices[0];
-    let end = dayIndices[0];
-    for (let i = 1; i < dayIndices.length; i++) {
-      if (dayIndices[i] === end + 1) {
-        end = dayIndices[i];
-      } else {
-        segments.push(start === end ? DAYS[start] : `${DAYS[start]}~${DAYS[end]}`);
-        start = dayIndices[i];
-        end = dayIndices[i];
-      }
-    }
-    segments.push(start === end ? DAYS[start] : `${DAYS[start]}~${DAYS[end]}`);
-    return segments.join(', ');
   };
 
   const handleSendMessage = async (text: string) => {
@@ -442,8 +419,6 @@ const App: React.FC = () => {
       artist: '',
       startDate: '',
       endDate: '',
-      selectedDays: [...DAYS],
-      closingNote: '',
       galleryName: '',
       region: '삼청/인사'
     });
@@ -461,13 +436,13 @@ const App: React.FC = () => {
     });
   };
 
-  const handleVerifyComplete = (userData: {uid: string, email: string, name: string}, isExisting: boolean) => {
+  const handleVerifyComplete = (userData: { uid: string; email: string | null; name: string; phoneNumber: string | null }, isExisting: boolean) => {
     if (isExisting) {
-      // 기존 유저는 바로 로그인
       const user = {
         id: userData.uid,
         name: userData.name,
-        email: userData.email,
+        email: userData.email || '',
+        phoneNumber: userData.phoneNumber,
         instagramUrl: null,
         bio: null,
         role: 'Viewer' as UserRole,
@@ -479,7 +454,6 @@ const App: React.FC = () => {
       setShowLoginOverlay(false);
       fetchUserFavorites(userData.uid);
     } else {
-      // 신규 유저는 프로필 설정으로
       setPendingUser(userData);
       setIsNewUser(true);
     }
@@ -494,6 +468,7 @@ const App: React.FC = () => {
         userId: userId, 
         email: userData.email, 
         nickname: userData.name, 
+        phoneNumber: pendingUser.phoneNumber,
         favorites: [], 
         instagramUrl: null, 
         bio: null, 
@@ -504,6 +479,7 @@ const App: React.FC = () => {
         id: userId, 
         name: userData.name, 
         email: userData.email, 
+        phoneNumber: pendingUser.phoneNumber,
         instagramUrl: null, 
         bio: null, 
         role: 'Viewer' as UserRole, 
@@ -669,13 +645,9 @@ const App: React.FC = () => {
     if (!formData.galleryName) { alert('갤러리 이름을 입력해 주세요.'); return; }
     if (!formData.representativeLink) { alert('전시 공식 링크를 입력해 주세요.'); return; }
     if (!formData.endDate) { alert('전시 마감일을 입력해 주세요.'); return; }
-    if (formData.selectedDays.length === 0) { alert('운영 요일을 선택해 주세요.'); return; }
     setIsSaving(true);
     setSavingMessage('전시 정보를 처리하고 있습니다...');
     try {
-      const daysStr = formatDayList(formData.selectedDays);
-      let openingHours = `${daysStr}`;
-      if (formData.closingNote) openingHours += ` (${formData.closingNote})`;
       const exhibitionPayload: any = {
         representativeLink: formData.representativeLink,
         title: formData.title,
@@ -684,9 +656,6 @@ const App: React.FC = () => {
         endDate: formData.endDate,
         galleryName: formData.galleryName,
         region: formData.region,
-        openingHours,
-        operatingDays: formData.selectedDays,
-        closingNote: formData.closingNote,
         authorNickname: currentUser.name,
         updatedAt: serverTimestamp(),
         creatorId: currentUser.id,
@@ -710,7 +679,7 @@ const App: React.FC = () => {
       try {
         const steps = stops.map(stop => {
           if (stop.type === 'exhibition') return { type: 'exhibition', exhibitionId: stop.exhibitionId };
-          return { type: 'teatime' };
+          return { type: 'teatime', memo: stop.memo };
         });
         const exhibitionIds = stops.filter(s => s.type === 'exhibition').map(s => s.exhibitionId!);
         await addDoc(collection(db, "tours"), {
@@ -730,7 +699,7 @@ const App: React.FC = () => {
     try {
       const steps = stops.map(stop => {
         if (stop.type === 'exhibition') return { type: 'exhibition', exhibitionId: stop.exhibitionId };
-        return { type: 'teatime' };
+        return { type: 'teatime', memo: stop.memo };
       });
       const exhibitionIds = stops.filter(s => s.type === 'exhibition').map(s => s.exhibitionId!);
       await updateDoc(doc(db, "tours", id), { title, exhibitionIds, steps, updatedAt: serverTimestamp() });
@@ -748,7 +717,7 @@ const App: React.FC = () => {
   };
 
   if (showLoginOverlay) {
-    if (isNewUser && pendingUser) return <SignupView email={pendingUser.email} onSignupComplete={handleSignupComplete} />;
+    if (isNewUser && pendingUser) return <SignupView email={pendingUser.email || ''} onSignupComplete={handleSignupComplete} />;
     return (
       <div className="fixed inset-0 z-[2000] bg-white max-w-lg mx-auto overflow-y-auto">
         <div className="absolute top-8 left-8 z-[2001]">
@@ -799,7 +768,7 @@ const App: React.FC = () => {
         ) : currentView === 'mytour' ? (
           <MyTourSession likedExhibitions={exhibitions.filter(ex => likedExhibitionIds.has(ex.id))} likedExhibitionIds={likedExhibitionIds} onSelectExhibition={handleExhibitionSelect} tourExhibitionIds={tourExhibitionIds} onUpdateTour={setTourExhibitionIds} createdTours={createdTours.filter(t => !blockedIds.has(t.creatorId))} onCreateTour={handleCreateTour} onUpdateTourData={handleUpdateTourData} onDeleteTour={handleDeleteTour} onLikeTourToggle={(id) => {}} onTourSelect={(t) => {}} allExhibitions={exhibitions} onSelectExhibitionRaw={handleExhibitionSelect} onCreateMeeting={(id, title) => requireAuth(() => { const tour = createdTours.find(ct => ct.id === id); const firstExId = tour?.exhibitionIds?.[0]; setMeetingContext({ id, title, type: 'tour', location: exhibitions.find(e => e.id === (firstExId || ''))?.region || '' }); navigateTo('meeting-create'); })} onCreatingStateChange={setIsTourCreating} requireAuth={requireAuth} currentUserId={currentUser.id} initialEditTour={pendingEditTour} onEditStarted={() => setPendingEditTour(null)} />
         ) : currentView === 'meeting' ? (
-          <MeetingList meetings={meetings.filter(m => !blockedIds.has(m.creatorId))} allExhibitions={exhibitions} allTours={createdTours} currentUserId={currentUser.id} onSelectMeeting={handleMeetingSelect} onEnterChat={(id) => requireAuth(() => { setSelectedMeetingId(id); navigateTo('chat-room'); })} onSelectUser={handleUserClick} onJoinRequest={handleJoinRequest} onKickParticipant={handleKickParticipant} />
+          <MeetingList meetings={meetings.filter(m => !blockedIds.has(m.creatorId))} allExhibitions={exhibitions} allTours={createdTours} currentUserId={currentUser.id} onSelectMeeting={handleMeetingSelect} onEnterChat={(id) => requireAuth(() => { setSelectedMeetingId(id); navigateTo('chat-room'); })} onSelectUser={handleUserClick} onJoinRequest={handleJoinRequest} onKickParticipant={handleKickParticipant} onEditMeeting={handleEditMeeting} onDeleteMeeting={handleDeleteMeeting} />
         ) : currentView === 'meeting-detail' && selectedMeetingId ? (
           <MeetingDetail 
             meeting={meetings.find(m => m.id === selectedMeetingId)!} 
@@ -887,9 +856,6 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </FormSection>
-              <FormSection title="이용 시간" required>
-                <OperatingHoursForm selectedDays={formData.selectedDays} closingNote={formData.closingNote} onDaysChange={(days) => setFormData({...formData, selectedDays: days})} onClosingNoteChange={(val) => setFormData({...formData, closingNote: val})} />
               </FormSection>
               <div className="pt-8 pb-12"><button type="submit" className="w-full py-5 bg-slate-800 text-white font-black rounded-[2rem] active:scale-95 transition-transform">{editingExhibitionId ? '수정 완료' : '등록 완료'}</button></div>
             </form>

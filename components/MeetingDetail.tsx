@@ -70,23 +70,26 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
       <div className={`fixed top-0 left-0 right-0 h-[80px] px-8 flex items-center justify-between z-50 max-w-lg mx-auto bg-white/80 backdrop-blur-xl transition-transform duration-500 ${isHeaderVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <button onClick={onBack} className="w-11 h-11 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 active:scale-90 transition-all"><i className="fa-solid fa-chevron-left"></i></button>
         <div className="flex items-center gap-3">
-          {isHost && (
+          {isHost ? (
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => onEditMeeting?.(meeting)}
-                className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black active:scale-95 transition-all"
+                className="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center active:scale-90 transition-all"
+                title="수정하기"
               >
-                EDIT
+                <i className="fa-solid fa-pen-to-square text-sm"></i>
               </button>
               <button 
-                onClick={() => { if(window.confirm('모임을 정말 삭제하시겠습니까?')) onDeleteMeeting?.(meeting.id); }}
-                className="px-4 py-2 bg-red-50 text-red-500 rounded-xl text-[10px] font-black active:scale-95 transition-all"
+                onClick={() => { if(window.confirm('모임을 정말 삭제하시겠습니까? 관련 채팅 내용도 모두 사라집니다.')) onDeleteMeeting?.(meeting.id); }}
+                className="w-11 h-11 bg-red-50 text-red-500 rounded-full flex items-center justify-center active:scale-90 transition-all"
+                title="삭제하기"
               >
-                DELETE
+                <i className="fa-solid fa-trash-can text-sm"></i>
               </button>
             </div>
+          ) : (
+            <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Meeting Detail</h2>
           )}
-          {!isHost && <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Meeting Detail</h2>}
         </div>
         {!isHost && <div className="w-11"></div>}
       </div>
@@ -127,7 +130,7 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
            </div>
         </div>
 
-        {/* Full Itinerary Section */}
+        {/* Itinerary Section */}
         <div className="space-y-8">
            <div className="flex items-center justify-between px-2">
               <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Full Schedule</h4>
@@ -136,7 +139,6 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
 
            {meeting.targetType === 'tour' && tour ? (
              <div className="relative pl-10 space-y-12 pt-2">
-                {/* Vertical Path Line */}
                 <div className="absolute left-[19px] top-4 bottom-4 w-[2px] bg-slate-100 border-l border-dashed border-slate-200"></div>
 
                 {steps.map((step, idx) => {
@@ -147,7 +149,6 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
                     
                     return (
                       <div key={`step-${idx}`} className="relative group cursor-pointer" onClick={() => onSelectExhibition(ex)}>
-                        {/* Circle Marker */}
                         <div className="absolute -left-[32px] top-0 w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black ring-4 ring-white shadow-xl z-10 transition-transform group-active:scale-110">
                           {exhibitionIdx}
                         </div>
@@ -173,14 +174,13 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
                   } else {
                     return (
                       <div key={`step-${idx}`} className="relative">
-                        {/* Tea Marker */}
                         <div className="absolute -left-[32px] top-0 w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center text-[11px] font-black ring-4 ring-white shadow-xl z-10">
                           <i className="fa-solid fa-mug-hot"></i>
                         </div>
                         
                         <div className="bg-amber-50/50 rounded-3xl p-6 border border-amber-100/50 flex flex-col gap-1 shadow-sm">
                            <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1">Tea Time & Break</p>
-                           <h5 className="text-sm font-black text-amber-900 leading-snug">함께 대화를 나누며 쉬어가는 시간</h5>
+                           <h5 className="text-sm font-black text-amber-900 leading-snug">{step.memo || '함께 대화를 나누며 쉬어가는 시간'}</h5>
                         </div>
                       </div>
                     );
@@ -207,7 +207,7 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
            )}
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 pb-20">
            <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest px-2">Participants</h4>
            <div className="flex flex-wrap gap-4">
               <div onClick={() => onSelectUser(meeting.creatorId)} className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center text-white text-[11px] font-black shadow-lg shadow-slate-200 cursor-pointer active:scale-90 transition-all">{meeting.creatorName.charAt(0)}</div>

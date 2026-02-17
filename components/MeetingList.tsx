@@ -12,6 +12,8 @@ interface MeetingListProps {
   onSelectUser: (userId: string) => void;
   onJoinRequest?: (meetingId: string) => void;
   onKickParticipant?: (meetingId: string, userId: string) => void;
+  onEditMeeting?: (meeting: Meeting) => void;
+  onDeleteMeeting?: (meetingId: string) => void;
 }
 
 type MeetingSortType = 'dateTime' | 'newest';
@@ -24,7 +26,9 @@ const MeetingList: React.FC<MeetingListProps> = ({
   onEnterChat,
   onSelectUser,
   onJoinRequest,
-  onKickParticipant
+  onKickParticipant,
+  onEditMeeting,
+  onDeleteMeeting
 }) => {
   const [activeTab, setActiveTab] = useState<'open' | 'mine'>('open');
   const [sortBy, setSortBy] = useState<MeetingSortType>('dateTime');
@@ -54,7 +58,6 @@ const MeetingList: React.FC<MeetingListProps> = ({
         return b.createdAt - a.createdAt;
       });
     } else {
-      // 내가 참여하거나 만든 모임 중에서도 지난 날짜는 제외
       return meetings.filter(m => {
         const isMyMeeting = m.creatorId === currentUserId || m.participants.some(p => p.userId === currentUserId);
         const isPast = isMeetingPast(m.meetingDate, m.meetingTime);
@@ -103,13 +106,15 @@ const MeetingList: React.FC<MeetingListProps> = ({
               key={m.id} 
               className="group bg-slate-50 p-8 rounded-[2.5rem] transition-all relative overflow-hidden"
             >
-              {/* Header Info */}
               <div className="flex justify-between items-start mb-8">
                 <div className="flex-1 pr-6">
                   <div className="flex items-center gap-2 mb-3">
                     <p className="text-[10px] font-black text-teal-400 uppercase tracking-[0.15em]">
                       {formatMeetingDate(m.meetingDate)} · {m.meetingTime}
                     </p>
+                    {isHost && (
+                      <span className="text-[8px] font-black bg-indigo-600 text-white px-1.5 py-0.5 rounded-md uppercase">My Host</span>
+                    )}
                   </div>
                   <h3 className="font-black text-slate-800 text-xl tracking-tight leading-snug mb-4">
                     {m.title}
@@ -119,12 +124,30 @@ const MeetingList: React.FC<MeetingListProps> = ({
                     <span className="text-[10px] font-black text-slate-500 truncate max-w-[200px]">{m.location}</span>
                   </div>
                 </div>
-                <div className="bg-white px-3 py-1.5 rounded-xl shadow-sm border border-slate-50">
-                  <p className="text-[10px] font-black text-slate-800">{acceptedCount}/{m.maxParticipants}</p>
+                
+                <div className="flex flex-col items-end gap-2">
+                  <div className="bg-white px-3 py-1.5 rounded-xl shadow-sm border border-slate-50">
+                    <p className="text-[10px] font-black text-slate-800">{acceptedCount}/{m.maxParticipants}</p>
+                  </div>
+                  {isHost && (
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onEditMeeting?.(m); }}
+                        className="w-8 h-8 bg-white border border-slate-100 rounded-lg flex items-center justify-center text-slate-400 active:scale-90"
+                      >
+                        <i className="fa-solid fa-pen-to-square text-[10px]"></i>
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); if(window.confirm('모임을 삭제하시겠습니까?')) onDeleteMeeting?.(m.id); }}
+                        className="w-8 h-8 bg-red-50 border border-red-100 rounded-lg flex items-center justify-center text-red-400 active:scale-90"
+                      >
+                        <i className="fa-solid fa-trash-can text-[10px]"></i>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Tour / Exhibition Timeline */}
               <div className="space-y-4 mb-10 px-1">
                 <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Itinerary</p>
                 <div className="relative pl-6 space-y-6">
@@ -166,11 +189,9 @@ const MeetingList: React.FC<MeetingListProps> = ({
                 </div>
               </div>
 
-              {/* Participants Avatars */}
               <div className="mb-10">
                 <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Participants</p>
                 <div className="flex flex-wrap gap-3">
-                  {/* Host */}
                   <div 
                     onClick={(e) => { e.stopPropagation(); onSelectUser(m.creatorId); }}
                     className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-white text-[10px] font-black shadow-lg shadow-slate-200 cursor-pointer active:scale-90 transition-all border-2 border-white relative"
@@ -181,7 +202,6 @@ const MeetingList: React.FC<MeetingListProps> = ({
                     </div>
                   </div>
                   
-                  {/* Accepted Members */}
                   {acceptedParticipants.map(p => (
                     <div key={p.userId} className="relative">
                       <div 
@@ -190,40 +210,11 @@ const MeetingList: React.FC<MeetingListProps> = ({
                       >
                         {p.userName.charAt(0)}
                       </div>
-                      
-                      {isHost && (
-                        <div className="absolute -top-1 -right-1 z-20">
-                           <button 
-                             onClick={(e) => { e.stopPropagation(); setActiveMenuUserId(activeMenuUserId?.uid === p.userId ? null : {mid: m.id, uid: p.userId}); }}
-                             className="w-5 h-5 bg-white border border-slate-100 rounded-full shadow-sm flex items-center justify-center text-slate-300 text-[8px] active:scale-90"
-                           >
-                             <i className="fa-solid fa-ellipsis"></i>
-                           </button>
-                           
-                           {activeMenuUserId?.mid === m.id && activeMenuUserId?.uid === p.userId && (
-                             <div className="absolute right-0 top-6 w-32 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-30 animate-in zoom-in-95 duration-200">
-                               <button 
-                                 onClick={(e) => { e.stopPropagation(); onSelectUser(p.userId); setActiveMenuUserId(null); }}
-                                 className="w-full px-3 py-2 text-left text-[9px] font-black text-slate-600 hover:bg-slate-50 border-b border-slate-50 flex items-center gap-2"
-                               >
-                                 프로필 보기
-                               </button>
-                               <button 
-                                 onClick={(e) => { e.stopPropagation(); onKickParticipant?.(m.id, p.userId); setActiveMenuUserId(null); }}
-                                 className="w-full px-3 py-2 text-left text-[9px] font-black text-red-400 hover:bg-red-50 flex items-center gap-2"
-                               >
-                                 내보내기
-                               </button>
-                             </div>
-                           )}
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="pt-6 border-t border-slate-100">
                 {isMember ? (
                   <button 

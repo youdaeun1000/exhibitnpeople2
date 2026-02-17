@@ -17,85 +17,105 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   onLogout
 }) => {
   return (
-    <div className="min-h-screen bg-slate-50 animate-in slide-in-from-bottom duration-300">
+    <div className="min-h-screen bg-white animate-in slide-in-from-right duration-500">
       {/* Settings Header */}
-      <div className="h-[64px] bg-white border-b border-slate-100 px-6 flex items-center justify-between sticky top-0 z-50 max-w-lg mx-auto">
+      <div className="fixed top-0 left-0 right-0 h-[80px] px-8 flex items-center justify-between z-50 max-w-lg mx-auto bg-white/80 backdrop-blur-xl">
         <button 
           onClick={onBack} 
-          className="w-10 h-10 -ml-2 flex items-center justify-center text-slate-400 active:scale-90 transition-transform"
+          className="w-11 h-11 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 active:scale-90 transition-all"
         >
-          <i className="fa-solid fa-chevron-left text-lg"></i>
+          <i className="fa-solid fa-chevron-left"></i>
         </button>
-        <h2 className="text-[16px] font-black text-slate-900 tracking-tight">설정</h2>
-        <div className="w-10"></div>
+        <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Settings</h2>
+        <div className="w-11"></div>
       </div>
 
-      <div className="max-w-lg mx-auto p-6 space-y-6">
-        {/* Settings List */}
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-50">
-          {/* 1. 차단 목록 */}
-          <button 
-            onClick={onNavigateBlocked}
-            className="w-full px-8 py-6 flex items-center justify-between active:bg-slate-50 transition-colors group text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-active:scale-110 transition-transform">
-                <i className="fa-solid fa-user-slash text-sm"></i>
-              </div>
-              <span className="text-sm font-bold text-slate-800">차단 목록</span>
-            </div>
-            <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-active:translate-x-1 transition-transform"></i>
-          </button>
-
-          {/* 2. 고객센터 */}
-          <button 
-            onClick={onNavigateCustomerService}
-            className="w-full px-8 py-6 flex items-center justify-between active:bg-slate-50 transition-colors group text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 group-active:scale-110 transition-transform">
-                <i className="fa-solid fa-circle-info text-sm"></i>
-              </div>
-              <span className="text-sm font-bold text-slate-800">고객센터</span>
-            </div>
-            <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-active:translate-x-1 transition-transform"></i>
-          </button>
-
-          {/* 3. 로그아웃 */}
-          <button 
-            onClick={onLogout}
-            className="w-full px-8 py-6 flex items-center justify-between active:bg-red-50 transition-colors group text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 group-active:scale-110 transition-transform">
-                <i className="fa-solid fa-right-from-bracket text-sm"></i>
-              </div>
-              <span className="text-sm font-bold text-red-500">로그아웃</span>
-            </div>
-            <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-active:translate-x-1 transition-transform"></i>
-          </button>
-
-          {/* 4. 서비스 탈퇴 신청 */}
-          <button 
-            onClick={onWithdrawal}
-            className="w-full px-8 py-6 flex items-center justify-between active:bg-slate-100 transition-colors group text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-active:scale-110 transition-transform">
-                <i className="fa-solid fa-user-xmark text-sm"></i>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-slate-400">서비스 탈퇴 신청</span>
-              </div>
-            </div>
-            <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-active:translate-x-1 transition-transform"></i>
-          </button>
+      <div className="pt-28 px-8 space-y-16">
+        <div className="space-y-6">
+          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Configuration</p>
+          <h3 className="text-3xl font-black text-slate-800 leading-tight tracking-tighter">애플리케이션 설정</h3>
         </div>
 
-        {/* Info Area */}
-        <div className="px-6 py-4 text-center">
-          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Version 1.2.4 (stable)</p>
-          <p className="text-[8px] font-bold text-slate-200 mt-2">© 2025 EXHIBIREG. ALL RIGHTS RESERVED.</p>
+        {/* Settings Group */}
+        <div className="space-y-12 pb-32">
+          <section className="space-y-6">
+            <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] px-2">Account & Safety</h4>
+            <div className="space-y-4">
+              <button 
+                onClick={onNavigateBlocked}
+                className="w-full bg-slate-50 rounded-[2rem] p-8 flex items-center justify-between group active:scale-[0.98] transition-all border border-slate-100/50"
+              >
+                <div className="flex items-center gap-6">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-500 shadow-sm group-hover:scale-110 transition-transform">
+                    <i className="fa-solid fa-user-slash text-sm"></i>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-slate-800 tracking-tight">차단 사용자 관리</p>
+                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-1">Blocked list</p>
+                  </div>
+                </div>
+                <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-hover:translate-x-1 transition-transform"></i>
+              </button>
+
+              <button 
+                onClick={onNavigateCustomerService}
+                className="w-full bg-slate-50 rounded-[2rem] p-8 flex items-center justify-between group active:scale-[0.98] transition-all border border-slate-100/50"
+              >
+                <div className="flex items-center gap-6">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-500 shadow-sm group-hover:scale-110 transition-transform">
+                    <i className="fa-solid fa-circle-info text-sm"></i>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-slate-800 tracking-tight">고객센터 문의</p>
+                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-1">Support center</p>
+                  </div>
+                </div>
+                <i className="fa-solid fa-chevron-right text-[10px] text-slate-200 group-hover:translate-x-1 transition-transform"></i>
+              </button>
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] px-2">Session Control</h4>
+            <div className="space-y-4">
+              <button 
+                onClick={onLogout}
+                className="w-full bg-red-50/30 rounded-[2rem] p-8 flex items-center justify-between group active:scale-[0.98] transition-all border border-red-50"
+              >
+                <div className="flex items-center gap-6">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm group-hover:scale-110 transition-transform">
+                    <i className="fa-solid fa-right-from-bracket text-sm"></i>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-red-600 tracking-tight">로그아웃</p>
+                    <p className="text-[9px] font-bold text-red-300 uppercase tracking-widest mt-1">Exit session</p>
+                  </div>
+                </div>
+                <i className="fa-solid fa-chevron-right text-[10px] text-red-100 group-hover:translate-x-1 transition-transform"></i>
+              </button>
+
+              <button 
+                onClick={onWithdrawal}
+                className="w-full bg-white rounded-[2rem] p-8 flex items-center justify-between group active:scale-[0.98] transition-all border border-slate-100"
+              >
+                <div className="flex items-center gap-6">
+                  <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 group-hover:scale-110 transition-transform">
+                    <i className="fa-solid fa-user-xmark text-sm"></i>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-slate-300 tracking-tight">서비스 탈퇴 신청</p>
+                    <p className="text-[9px] font-bold text-slate-200 uppercase tracking-widest mt-1">Withdrawal guide</p>
+                  </div>
+                </div>
+                <i className="fa-solid fa-chevron-right text-[10px] text-slate-100"></i>
+              </button>
+            </div>
+          </section>
+
+          <div className="pt-8 text-center space-y-2">
+            <p className="text-[10px] font-black text-slate-200 uppercase tracking-[0.3em]">Version 1.2.4 stable</p>
+            <p className="text-[8px] font-bold text-slate-100 uppercase tracking-tight">© 2025 EXHIBIREG. ALL RIGHTS RESERVED.</p>
+          </div>
         </div>
       </div>
     </div>

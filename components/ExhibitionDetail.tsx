@@ -130,16 +130,6 @@ const ExhibitionDetail: React.FC<ExhibitionDetailProps> = ({
                 {exhibition.region && <p className="text-[10px] font-black text-slate-300 mt-1 uppercase tracking-tight">{exhibition.region} Area</p>}
               </div>
             </div>
-            
-            {exhibition.openingHours && (
-              <div className="flex items-start gap-4">
-                <div className="w-1.5 h-1.5 bg-slate-200 rounded-full mt-2 flex-shrink-0"></div>
-                <div>
-                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Operating Info</p>
-                  <p className="text-sm font-bold text-slate-700">{exhibition.openingHours}</p>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="px-4">

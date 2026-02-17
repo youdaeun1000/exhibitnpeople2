@@ -248,6 +248,7 @@ const TourDetail: React.FC<TourDetailProps> = ({
                          </div>
                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-black text-amber-900 uppercase">티타임</p>
+                            {step.memo && <p className="text-[11px] font-bold text-amber-700 leading-snug mt-1">{step.memo}</p>}
                          </div>
                        </div>
                     </div>
