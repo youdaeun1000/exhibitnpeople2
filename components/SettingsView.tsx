@@ -7,6 +7,7 @@ interface SettingsViewProps {
   onNavigateCustomerService: () => void;
   onWithdrawal: () => void;
   onLogout: () => void;
+  userEmail: string | null;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
@@ -14,7 +15,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   onNavigateBlocked, 
   onNavigateCustomerService,
   onWithdrawal,
-  onLogout
+  onLogout,
+  userEmail
 }) => {
   return (
     <div className="min-h-screen bg-white animate-in slide-in-from-right duration-500">
@@ -33,7 +35,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="pt-28 px-8 space-y-16">
         <div className="space-y-6">
           <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Configuration</p>
-          <h3 className="text-3xl font-black text-slate-800 leading-tight tracking-tighter">애플리케이션 설정</h3>
+          <h3 className="text-3xl font-black text-slate-800 leading-tight tracking-tighter">Application Settings</h3>
+          
+          {/* User Email Info Section */}
+          <div className="mt-8 p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100/50 flex flex-col gap-2">
+            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest px-1">Logged in as</p>
+            <div className="flex items-center gap-3">
+              <i className="fa-solid fa-at text-indigo-300 text-xs"></i>
+              <p className="text-sm font-black text-slate-700 truncate">{userEmail || '익명 사용자'}</p>
+            </div>
+          </div>
         </div>
 
         {/* Settings Group */}

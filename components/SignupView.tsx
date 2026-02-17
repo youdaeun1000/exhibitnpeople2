@@ -8,7 +8,6 @@ interface SignupViewProps {
 
 export default function SignupView({ email, onSignupComplete }: SignupViewProps) {
   const [nickname, setNickname] = useState('');
-  const [userEmail, setUserEmail] = useState(email);
   const [agreed, setAgreed] = useState({
     terms: false,
     privacy: false,
@@ -39,7 +38,7 @@ export default function SignupView({ email, onSignupComplete }: SignupViewProps)
     if (isProfileValid) {
       onSignupComplete({
         name: nickname.trim(),
-        email: userEmail.trim() || 'none@provided.com',
+        email: email,
       });
     }
   };
@@ -48,41 +47,40 @@ export default function SignupView({ email, onSignupComplete }: SignupViewProps)
     <div className="min-h-screen bg-white flex flex-col p-8 max-w-lg mx-auto animate-in fade-in duration-500">
       <div className="mb-12 mt-12">
         <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-indigo-100">
-          <i className="fa-solid fa-user-plus text-xl"></i>
+          <i className="fa-solid fa-user-check text-xl"></i>
         </div>
         <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
-          인증 완료!<br/>
-          프로필을 설정해 주세요
+          거의 다 되었습니다!<br/>
+          활동하실 이름을 알려주세요
         </h1>
         <p className="text-[10px] text-slate-400 mt-3 font-black uppercase tracking-widest">
-          START YOUR JOURNEY WITH <span className="text-indigo-600">EXHIBIREG</span>
+          COMPLETE YOUR <span className="text-indigo-600">EXHIBIREG</span> PROFILE
         </p>
       </div>
 
       <div className="space-y-10 flex-1 animate-in slide-in-from-bottom-4 duration-500">
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2">활동 닉네임</label>
-          <input 
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            placeholder="한글/영어 2~10자"
-            className={`w-full px-6 py-5 bg-slate-50 border rounded-3xl font-bold text-sm focus:outline-none focus:ring-4 transition-all ${nickname && validateNickname(nickname) ? 'border-red-200 ring-red-50' : 'border-slate-50 focus:ring-indigo-100/30 focus:bg-white'}`}
-          />
-          {nickname && validateNickname(nickname) && (
-            <p className="text-[10px] font-bold text-red-500 ml-2 mt-2">{validateNickname(nickname)}</p>
-          )}
-        </div>
+        <div className="space-y-6">
+           <div>
+             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2">활동 닉네임</label>
+             <input 
+               type="text"
+               value={nickname}
+               onChange={(e) => setNickname(e.target.value)}
+               placeholder="한글/영어 2~10자"
+               className={`w-full px-6 py-5 bg-slate-50 border rounded-3xl font-bold text-sm focus:outline-none focus:ring-4 transition-all ${nickname && validateNickname(nickname) ? 'border-red-200 ring-red-50' : 'border-slate-50 focus:ring-indigo-100/30 focus:bg-white'}`}
+             />
+             {nickname && validateNickname(nickname) && (
+               <p className="text-[10px] font-bold text-red-500 ml-2 mt-2">{validateNickname(nickname)}</p>
+             )}
+           </div>
 
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2">이메일 주소 (선택)</label>
-          <input 
-            type="email"
-            value={userEmail}
-            onChange={(e) => setUserEmail(e.target.value)}
-            placeholder="example@email.com"
-            className="w-full px-6 py-5 bg-slate-50 border border-slate-50 rounded-3xl font-bold text-sm focus:outline-none focus:ring-4 focus:ring-indigo-100/30 focus:bg-white transition-all"
-          />
+           <div>
+             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-2 opacity-50">인증된 이메일</label>
+             <div className="w-full px-6 py-5 bg-slate-50 border border-slate-50 rounded-3xl font-bold text-sm text-slate-400 flex items-center justify-between">
+                <span>{email}</span>
+                <i className="fa-solid fa-lock text-[10px] opacity-20"></i>
+             </div>
+           </div>
         </div>
 
         <div className="space-y-4">

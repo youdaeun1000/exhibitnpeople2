@@ -225,6 +225,7 @@ const App: React.FC = () => {
         setCurrentUser(prev => ({ 
           ...prev, 
           name: data.nickname || data.name || '알 수 없음',
+          email: data.email || prev.email || '',
           phoneNumber: data.phoneNumber || null,
           instagramUrl: data.instagramUrl || null,
           bio: data.bio || null,
@@ -799,7 +800,7 @@ const App: React.FC = () => {
             <div className="flex flex-col items-center justify-center py-40 px-10 text-center"><p className="text-sm font-medium text-slate-400">사용자를 찾을 수 없습니다.</p><button onClick={goBack} className="mt-8 px-10 py-4 bg-slate-800 text-white font-black rounded-[2rem] text-xs">뒤로 가기</button></div>
           )
         ) : currentView === 'settings' ? (
-          <SettingsView onBack={goBack} onNavigateBlocked={() => navigateTo('blocked-management')} onNavigateCustomerService={() => navigateTo('customer-service')} onWithdrawal={() => navigateTo('withdrawal-guide')} onLogout={handleLogout} />
+          <SettingsView onBack={goBack} onNavigateBlocked={() => navigateTo('blocked-management')} onNavigateCustomerService={() => navigateTo('customer-service')} onWithdrawal={() => navigateTo('withdrawal-guide')} onLogout={handleLogout} userEmail={currentUser.email} />
         ) : currentView === 'blocked-management' ? (
           <BlockedManagementView blockedIds={blockedIds} onBack={goBack} onUnblock={handleBlockToggle} />
         ) : currentView === 'withdrawal-guide' ? ( <WithdrawalGuideView onBack={goBack} />
