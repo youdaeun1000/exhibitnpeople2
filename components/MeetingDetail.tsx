@@ -56,8 +56,11 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
 
   const tour = allTours.find(t => t.id === meeting.targetId);
   const exhibition = allExhibitions.find(e => e.id === meeting.targetId);
-  const acceptedParticipants = meeting.participants.filter(p => p.status === 'accepted');
-  const acceptedCount = acceptedParticipants.length + 1;
+  
+  // 전체 확정 인원 (호스트 포함)
+  const acceptedCount = meeting.participants.filter(p => p.status === 'accepted').length;
+  // 목록용 참여자 (호스트 제외)
+  const otherParticipants = meeting.participants.filter(p => p.status === 'accepted' && p.userId !== meeting.creatorId);
 
   const openKakaoMapSearch = (query: string) => {
     window.open(`https://map.kakao.com/?q=${encodeURIComponent(query)}`, '_blank');
@@ -103,15 +106,24 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
         <div className="bg-slate-50 rounded-[2.5rem] p-8 space-y-8 shadow-sm border border-slate-100/50">
            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-300 shadow-sm"><i className="fa-solid fa-user-circle text-lg"></i></div>
+                 <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-white shadow-lg relative">
+                    <i className="fa-solid fa-crown text-[10px] absolute -top-1 -right-1 text-teal-400 bg-white rounded-full p-1 shadow-sm"></i>
+                    <span className="font-black text-xs">{(meeting.creatorName || '익').charAt(0)}</span>
+                 </div>
                  <button onClick={() => onSelectUser(meeting.creatorId)} className="text-left group/user">
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Host</p>
-                    <p className="text-sm font-bold text-slate-800 group-hover/user:text-indigo-600 transition-colors">{meeting.creatorName}</p>
+                    <div className="flex items-center gap-1.5">
+                       <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Host</p>
+                       {meeting.creatorId === currentUserId && <span className="text-[7px] font-black text-indigo-400 bg-indigo-50 px-1 rounded">YOU</span>}
+                    </div>
+                    <p className="text-sm font-bold text-slate-800 group-hover/user:text-indigo-600 transition-colors">{meeting.creatorName || '익명'}</p>
                  </button>
               </div>
               <div className="text-right">
                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Members</p>
-                 <p className="text-sm font-bold text-slate-800">{acceptedCount}/{meeting.maxParticipants}</p>
+                 <div className="flex items-baseline gap-1 justify-end">
+                    <p className="text-lg font-black text-slate-800">{acceptedCount}</p>
+                    <p className="text-[10px] font-bold text-slate-300">/ {meeting.maxParticipants}</p>
+                 </div>
               </div>
            </div>
            
@@ -207,51 +219,86 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({
            )}
         </div>
 
+        {/* Participants Section Improved */}
         <div className="space-y-6 pb-20">
-           <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest px-2">Participants</h4>
-           <div className="flex flex-wrap gap-4">
-              <div onClick={() => onSelectUser(meeting.creatorId)} className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center text-white text-[11px] font-black shadow-lg shadow-slate-200 cursor-pointer active:scale-90 transition-all">{meeting.creatorName.charAt(0)}</div>
-              
-              {acceptedParticipants.map(p => (
-                <div key={p.userId} className="relative group">
-                  <div 
-                    onClick={() => onSelectUser(p.userId)} 
-                    className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 text-[11px] font-black border border-slate-100 cursor-pointer active:scale-90 transition-all"
-                  >
-                    {p.userName.charAt(0)}
-                  </div>
-                  
-                  {isHost && (
-                    <div className="absolute -top-1 -right-1">
-                       <button 
-                         onClick={() => setActiveMenuUserId(activeMenuUserId === p.userId ? null : p.userId)}
-                         className="w-6 h-6 bg-white border border-slate-100 rounded-full shadow-sm flex items-center justify-center text-slate-300 text-[8px] active:scale-90 transition-all"
-                       >
-                         <i className="fa-solid fa-ellipsis"></i>
-                       </button>
-                       
-                       {activeMenuUserId === p.userId && (
-                         <div className="absolute right-0 top-8 w-40 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-[130] animate-in zoom-in-95 duration-200">
-                           <button 
-                             onClick={() => { onSelectUser(p.userId); setActiveMenuUserId(null); }}
-                             className="w-full px-4 py-3 text-left text-[10px] font-black text-slate-600 hover:bg-slate-50 border-b border-slate-50 flex items-center gap-2"
-                           >
-                             <i className="fa-solid fa-user-circle opacity-30"></i>
-                             프로필 보기
-                           </button>
-                           <button 
-                             onClick={() => { onKickParticipant?.(p.userId); setActiveMenuUserId(null); }}
-                             className="w-full px-4 py-3 text-left text-[10px] font-black text-red-400 hover:bg-red-50 flex items-center gap-2"
-                           >
-                             <i className="fa-solid fa-user-xmark opacity-50"></i>
-                             모임에서 내보내기
-                           </button>
-                         </div>
-                       )}
+           <div className="flex items-center justify-between px-2">
+              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Confirmed Members</h4>
+              <span className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Safety verified</span>
+           </div>
+           
+           <div className="grid grid-cols-4 sm:grid-cols-5 gap-6">
+              {/* Host Card */}
+              <div className="flex flex-col items-center gap-3">
+                 <div 
+                    onClick={() => onSelectUser(meeting.creatorId)} 
+                    className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center text-white text-sm font-black shadow-xl shadow-slate-200 cursor-pointer active:scale-90 transition-all border-2 border-white relative"
+                 >
+                    {(meeting.creatorName || '익').charAt(0)}
+                    <div className="absolute -top-1.5 -right-1.5 bg-teal-400 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm ring-2 ring-slate-800/5">
+                      <i className="fa-solid fa-crown text-[7px] text-white"></i>
                     </div>
-                  )}
-                </div>
-              ))}
+                 </div>
+                 <div className="flex flex-col items-center min-w-0 w-full">
+                    <p className="text-[10px] font-black text-slate-800 truncate text-center w-full">{meeting.creatorName || '익명'}</p>
+                    <p className="text-[7px] font-black text-teal-500 uppercase tracking-tight">Host</p>
+                 </div>
+              </div>
+              
+              {/* Participants Cards (Host를 제외하고 보여줌) */}
+              {otherParticipants.map(p => {
+                const isMe = p.userId === currentUserId;
+                return (
+                  <div key={p.userId} className="flex flex-col items-center gap-3 relative">
+                    <div 
+                      onClick={() => onSelectUser(p.userId)} 
+                      className={`w-14 h-14 rounded-2xl flex items-center justify-center text-sm font-black border-2 transition-all cursor-pointer active:scale-90 ${isMe ? 'bg-indigo-50 border-indigo-200 text-indigo-600 shadow-lg shadow-indigo-100' : 'bg-white border-slate-100 text-slate-400 shadow-sm'}`}
+                    >
+                      {(p.userName || '익').charAt(0)}
+                      {isMe && (
+                        <div className="absolute -top-1.5 -right-1.5 bg-indigo-500 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                          <span className="text-[6px] text-white font-black">ME</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col items-center min-w-0 w-full px-1">
+                      <p className={`text-[10px] font-black truncate text-center w-full ${isMe ? 'text-indigo-600' : 'text-slate-400'}`}>
+                        {p.userName || '익명'}
+                      </p>
+                    </div>
+                    
+                    {isHost && (
+                      <div className="absolute -top-2 -right-2">
+                        <button 
+                          onClick={() => setActiveMenuUserId(activeMenuUserId === p.userId ? null : p.userId)}
+                          className={`w-6 h-6 rounded-full shadow-sm flex items-center justify-center text-[8px] active:scale-90 transition-all border ${activeMenuUserId === p.userId ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-300'}`}
+                        >
+                          <i className="fa-solid fa-ellipsis"></i>
+                        </button>
+                        
+                        {activeMenuUserId === p.userId && (
+                          <div className="absolute right-0 top-8 w-40 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-[130] animate-in zoom-in-95 duration-200">
+                            <button 
+                              onClick={() => { onSelectUser(p.userId); setActiveMenuUserId(null); }}
+                              className="w-full px-4 py-3 text-left text-[10px] font-black text-slate-600 hover:bg-slate-50 border-b border-slate-50 flex items-center gap-2"
+                            >
+                              <i className="fa-solid fa-user-circle opacity-30"></i>
+                              프로필 보기
+                            </button>
+                            <button 
+                              onClick={() => { if(window.confirm(`${p.userName || '익명'}님을 정말 내보내시겠습니까?`)) onKickParticipant?.(p.userId); setActiveMenuUserId(null); }}
+                              className="w-full px-4 py-3 text-left text-[10px] font-black text-red-500 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              <i className="fa-solid fa-user-xmark opacity-50"></i>
+                              모임에서 내보내기
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
            </div>
         </div>
       </div>

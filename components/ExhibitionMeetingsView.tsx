@@ -62,7 +62,8 @@ const ExhibitionMeetingsView: React.FC<ExhibitionMeetingsViewProps> = ({
         <div className="space-y-8 pb-20">
           {openMeetings.length > 0 ? (
             openMeetings.map((m) => {
-              const acceptedCount = m.participants.filter(p => p.status === 'accepted').length + 1;
+              // participants는 호스트를 포함하고 있으므로 필터링 결과 개수가 곧 현재 참여 인원입니다.
+              const acceptedCount = m.participants.filter(p => p.status === 'accepted').length;
               return (
                 <div 
                   key={m.id} 
@@ -88,9 +89,9 @@ const ExhibitionMeetingsView: React.FC<ExhibitionMeetingsViewProps> = ({
                       onClick={(e) => { e.stopPropagation(); onSelectUser(m.creatorId); }}
                     >
                       <div className="w-6 h-6 bg-white rounded-lg flex items-center justify-center text-[8px] shadow-sm">
-                        {m.creatorName.charAt(0)}
+                        {(m.creatorName || '익').charAt(0)}
                       </div>
-                      <span>{m.creatorName}</span>
+                      <span>{m.creatorName || '익명'}</span>
                     </div>
                     <span className="text-[10px] font-black text-slate-200 uppercase tracking-widest">JOIN →</span>
                   </div>

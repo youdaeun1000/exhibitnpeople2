@@ -24,7 +24,7 @@ import ReportGuideView from './components/ReportGuideView';
 import CustomerServiceView from './components/CustomerServiceView';
 import ExhibitionMeetingsView from './components/ExhibitionMeetingsView';
 import ReportModal from './components/ReportModal';
-import { ExhibitionData, ViewType, Tour, Meeting, ChatMessage, DayOfWeek, TourStop, UserRole, ReportReason } from './types';
+import { ExhibitionData, ViewType, Tour, Meeting, ChatMessage, DayOfWeek, TourStop, UserRole, ReportReason, Participant } from './types';
 import { DUMMY_EXHIBITIONS, DUMMY_USERS, DAYS, REGIONS } from './constants';
 
 const App: React.FC = () => {
@@ -169,10 +169,23 @@ const App: React.FC = () => {
     try {
       const q = query(collection(db, "meetings"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
-      const creatorIds: string[] = Array.from(new Set(querySnapshot.docs.map(doc => doc.data().creatorId as string))).filter((id): id is string => !!id);
       
+      // Collect all unique user IDs involved (creators and participants)
+      const allUserIds = new Set<string>();
+      querySnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.creatorId) allUserIds.add(data.creatorId);
+        if (data.participants && Array.isArray(data.participants)) {
+          data.participants.forEach((p: any) => {
+            const uid = typeof p === 'string' ? p : p.userId;
+            if (uid) allUserIds.add(uid);
+          });
+        }
+      });
+
+      // Fetch all unique user profiles at once
       const userProfiles: Record<string, string> = {};
-      await Promise.all(creatorIds.map(async (uid: string) => {
+      await Promise.all(Array.from(allUserIds).map(async (uid: string) => {
         try {
           const uDoc = await getDoc(doc(db, "Users", uid));
           if (uDoc.exists()) {
@@ -189,6 +202,17 @@ const App: React.FC = () => {
         const meetingDateStr = data.meetingDate && data.meetingDate.toDate ? data.meetingDate.toDate().toISOString().split('T')[0] : '';
         const meetingTimeStr = data.meetingDate && data.meetingDate.toDate ? data.meetingDate.toDate().toTimeString().split(' ')[0].slice(0, 5) : '';
         
+        // Map participants to include correct userNames
+        const mappedParticipants: Participant[] = (data.participants || []).map((p: any) => {
+          const userId = typeof p === 'string' ? p : p.userId;
+          return {
+            userId,
+            status: typeof p === 'string' ? 'accepted' : (p.status || 'accepted'),
+            userName: userProfiles[userId] || '알 수 없음',
+            answer: typeof p === 'string' ? '' : (p.answer || '')
+          };
+        });
+
         return { 
           id: doc.id, 
           ...data,
@@ -198,10 +222,11 @@ const App: React.FC = () => {
           creatorName: userProfiles[data.creatorId as string] || '알 수 없음',
           meetingDate: meetingDateStr,
           meetingTime: meetingTimeStr,
-          participants: (data.participants || []).map((p: any) => typeof p === 'string' ? { userId: p, status: 'accepted', userName: '참가자' } : p),
+          participants: mappedParticipants,
           kickedUserIds: data.kickedUserIds || []
         };
-      }) as any[];
+      }) as Meeting[];
+      
       setMeetings(fetched);
     } catch (error) {
       console.error("모임 목록 로드 실패:", error);
@@ -566,36 +591,6 @@ const App: React.FC = () => {
     } catch (e) { console.error("역할 업데이트 실패:", e); }
   };
 
-  const handleReportUser = (id: string, name: string) => {
-    requireAuth(() => {
-      setReportTarget({ id, name });
-      setIsReportModalOpen(true);
-    });
-  };
-
-  const handleReportSubmit = async (reason: ReportReason, description: string) => {
-    if (!reportTarget) return;
-    setIsSaving(true);
-    setSavingMessage('신고를 안전하게 접수 중입니다...');
-    try {
-      await addDoc(collection(db, "reports"), {
-        targetUserId: reportTarget.id,
-        reporterUserId: currentUser.id,
-        reason,
-        description,
-        createdAt: serverTimestamp()
-      });
-      alert('신고가 정상적으로 접수되었습니다. 깨끗한 커뮤니티를 위한 참여에 감사드립니다.');
-      setIsReportModalOpen(false);
-      setReportTarget(null);
-    } catch (error) {
-      console.error("신고 저장 실패:", error);
-      alert('신고 접수 중 오류가 발생했습니다.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleLogout = async () => {
     if (!window.confirm("로그아웃 하시겠습니까?")) return;
     setIsSaving(true);
@@ -638,6 +633,36 @@ const App: React.FC = () => {
   const handleEditMeeting = (meeting: Meeting) => {
     setEditingMeetingId(meeting.id);
     navigateTo('meeting-edit');
+  };
+
+  // handleReportUser function to fix compilation errors
+  const handleReportUser = (userId: string, userName: string) => {
+    setReportTarget({ id: userId, name: userName });
+    setIsReportModalOpen(true);
+  };
+
+  // handleReportSubmit function to fix compilation errors
+  const handleReportSubmit = async (reason: ReportReason, description: string) => {
+    if (!reportTarget) return;
+    setIsSaving(true);
+    setSavingMessage('신고를 접수하고 있습니다...');
+    try {
+      await addDoc(collection(db, "reports"), {
+        targetUserId: reportTarget.id,
+        reporterUserId: currentUser.id,
+        reason,
+        description,
+        createdAt: serverTimestamp()
+      });
+      alert('신고가 정상적으로 접수되었습니다. 운영팀에서 확인 후 조치하겠습니다.');
+      setIsReportModalOpen(false);
+      setReportTarget(null);
+    } catch (error) {
+      console.error("Report Error:", error);
+      alert('신고 접수 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

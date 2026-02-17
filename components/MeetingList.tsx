@@ -32,7 +32,6 @@ const MeetingList: React.FC<MeetingListProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'open' | 'mine'>('open');
   const [sortBy, setSortBy] = useState<MeetingSortType>('dateTime');
-  const [activeMenuUserId, setActiveMenuUserId] = useState<{mid: string, uid: string} | null>(null);
 
   const formatMeetingDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -48,7 +47,7 @@ const MeetingList: React.FC<MeetingListProps> = ({
   const filteredMeetings = useMemo(() => {
     if (activeTab === 'open') {
       const base = meetings.filter(m => {
-        const acceptedCount = m.participants.filter(p => p.status === 'accepted').length + 1;
+        const acceptedCount = m.participants.filter(p => p.status === 'accepted').length;
         const isFull = acceptedCount >= m.maxParticipants;
         const isPast = isMeetingPast(m.meetingDate, m.meetingTime);
         return !isFull && !isPast;
@@ -91,8 +90,11 @@ const MeetingList: React.FC<MeetingListProps> = ({
 
       <main className="px-8 space-y-12 animate-in fade-in duration-500 pt-6">
         {filteredMeetings.length > 0 ? filteredMeetings.map(m => {
-          const acceptedParticipants = m.participants.filter(p => p.status === 'accepted');
-          const acceptedCount = acceptedParticipants.length + 1;
+          // 전체 확정 인원 (호스트 포함)
+          const acceptedCount = m.participants.filter(p => p.status === 'accepted').length;
+          // 목록용 참여자 (호스트 제외)
+          const otherParticipants = m.participants.filter(p => p.status === 'accepted' && p.userId !== m.creatorId);
+          
           const isMember = m.creatorId === currentUserId || m.participants.some(p => p.userId === currentUserId && p.status === 'accepted');
           const isPending = m.participants.some(p => p.userId === currentUserId && p.status === 'pending');
           const isHost = m.creatorId === currentUserId;
@@ -190,28 +192,37 @@ const MeetingList: React.FC<MeetingListProps> = ({
               </div>
 
               <div className="mb-10">
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Participants</p>
-                <div className="flex flex-wrap gap-3">
+                <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Participants Summary</p>
+                <div className="flex items-center gap-2">
                   <div 
                     onClick={(e) => { e.stopPropagation(); onSelectUser(m.creatorId); }}
-                    className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-white text-[10px] font-black shadow-lg shadow-slate-200 cursor-pointer active:scale-90 transition-all border-2 border-white relative"
+                    className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-white text-[10px] font-black shadow-lg shadow-slate-200 cursor-pointer active:scale-90 transition-all border-2 border-white relative z-10"
+                    title={m.creatorName}
                   >
-                    {m.creatorName.charAt(0)}
+                    {(m.creatorName || '익').charAt(0)}
                     <div className="absolute -top-1.5 -right-1.5 bg-teal-400 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                       <i className="fa-solid fa-crown text-[6px] text-white"></i>
                     </div>
                   </div>
                   
-                  {acceptedParticipants.map(p => (
-                    <div key={p.userId} className="relative">
+                  <div className="flex -space-x-4">
+                    {otherParticipants.map((p, idx) => (
                       <div 
+                        key={p.userId} 
                         onClick={(e) => { e.stopPropagation(); onSelectUser(p.userId); }}
-                        className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 text-[10px] font-black border border-slate-100 cursor-pointer active:scale-90 transition-all shadow-sm"
+                        className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-300 text-[10px] font-black border border-slate-100 cursor-pointer active:scale-90 transition-all shadow-sm hover:z-20`}
+                        style={{ zIndex: 5 - idx }}
+                        title={p.userName}
                       >
-                        {p.userName.charAt(0)}
+                        {(p.userName || '익').charAt(0)}
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                    {acceptedCount < m.maxParticipants && (
+                      <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-300 text-[10px] font-black border border-white border-dashed">
+                        <i className="fa-solid fa-plus opacity-30"></i>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

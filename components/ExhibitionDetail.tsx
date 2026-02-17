@@ -140,12 +140,16 @@ const ExhibitionDetail: React.FC<ExhibitionDetailProps> = ({
         <div className="space-y-8">
           <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest px-2">Active Meetings</h3>
           <div className="space-y-4">
-            {activeExhibitionMeetings.map(meeting => (
-              <div key={meeting.id} onClick={() => onSelectMeeting(meeting.id)} className="bg-slate-50 p-8 rounded-[2.5rem] active:bg-slate-100 transition-all cursor-pointer">
-                <div className="flex justify-between items-start mb-6"><h4 className="text-sm font-black text-slate-800 leading-snug pr-4">{meeting.title}</h4><span className="text-[10px] font-black text-teal-400">{meeting.participants.length+1}/{meeting.maxParticipants}</span></div>
-                <div className="flex items-center justify-between"><p className="text-[10px] font-bold text-slate-400 italic">{meeting.meetingDate}</p><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Detail →</span></div>
-              </div>
-            ))}
+            {activeExhibitionMeetings.map(meeting => {
+              // participants는 호스트를 포함하고 있으므로 필터링 결과 개수가 곧 현재 참여 인원입니다.
+              const acceptedCount = meeting.participants.filter(p => p.status === 'accepted').length;
+              return (
+                <div key={meeting.id} onClick={() => onSelectMeeting(meeting.id)} className="bg-slate-50 p-8 rounded-[2.5rem] active:bg-slate-100 transition-all cursor-pointer">
+                  <div className="flex justify-between items-start mb-6"><h4 className="text-sm font-black text-slate-800 leading-snug pr-4">{meeting.title}</h4><span className="text-[10px] font-black text-teal-400">{acceptedCount}/{meeting.maxParticipants}</span></div>
+                  <div className="flex items-center justify-between"><p className="text-[10px] font-bold text-slate-400 italic">{meeting.meetingDate}</p><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Detail →</span></div>
+                </div>
+              );
+            })}
             {activeExhibitionMeetings.length === 0 && (
               <div className="py-20 text-center opacity-20"><p className="text-[10px] font-black uppercase tracking-widest">No meetings available.</p></div>
             )}
