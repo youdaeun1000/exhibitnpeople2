@@ -170,7 +170,6 @@ const App: React.FC = () => {
       const q = query(collection(db, "meetings"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
       
-      // Collect all unique user IDs involved (creators and participants)
       const allUserIds = new Set<string>();
       querySnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -183,7 +182,6 @@ const App: React.FC = () => {
         }
       });
 
-      // Fetch all unique user profiles at once
       const userProfiles: Record<string, string> = {};
       await Promise.all(Array.from(allUserIds).map(async (uid: string) => {
         try {
@@ -202,7 +200,6 @@ const App: React.FC = () => {
         const meetingDateStr = data.meetingDate && data.meetingDate.toDate ? data.meetingDate.toDate().toISOString().split('T')[0] : '';
         const meetingTimeStr = data.meetingDate && data.meetingDate.toDate ? data.meetingDate.toDate().toTimeString().split(' ')[0].slice(0, 5) : '';
         
-        // Map participants to include correct userNames
         const mappedParticipants: Participant[] = (data.participants || []).map((p: any) => {
           const userId = typeof p === 'string' ? p : p.userId;
           return {
@@ -246,6 +243,7 @@ const App: React.FC = () => {
       if (uDoc.exists()) {
         const data = uDoc.data();
         if (data.favorites && Array.isArray(data.favorites)) setLikedExhibitionIds(new Set(data.favorites));
+        if (data.blockedUsers && Array.isArray(data.blockedUsers)) setBlockedIds(new Set(data.blockedUsers));
         
         setCurrentUser(prev => ({ 
           ...prev, 
@@ -257,7 +255,7 @@ const App: React.FC = () => {
           role: data.role || 'Viewer'
         }));
       }
-    } catch (error) { console.error("좋아요 목록 동기화 실패:", error); }
+    } catch (error) { console.error("사용자 데이터 동기화 실패:", error); }
   };
 
   useEffect(() => {
@@ -349,7 +347,8 @@ const App: React.FC = () => {
         alert("이미 참여 중인 모임입니다.");
         return;
       }
-      const acceptedCount = meeting.participants.filter(p => p.status === 'accepted').length + 1;
+      
+      const acceptedCount = meeting.participants.filter(p => p.status === 'accepted').length;
       if (acceptedCount >= meeting.maxParticipants) {
         alert("정원이 초과되어 신청할 수 없습니다.");
         return;
@@ -361,9 +360,17 @@ const App: React.FC = () => {
       setSavingMessage("참가 신청을 처리하고 있습니다...");
       try {
         const meetingRef = doc(db, "meetings", meetingId);
+        const newParticipant = {
+          userId: currentUser.id,
+          userName: currentUser.name,
+          status: 'accepted',
+          answer: '참가 신청'
+        };
+        
         await updateDoc(meetingRef, {
-          participants: arrayUnion(currentUser.id)
+          participants: arrayUnion(newParticipant)
         });
+        
         const chatRef = doc(db, "chats", meetingId);
         await setDoc(chatRef, {
           participants: arrayUnion(currentUser.id),
@@ -371,6 +378,7 @@ const App: React.FC = () => {
           lastMessageAt: serverTimestamp(),
           meetingTitle: meeting.title
         }, { merge: true });
+        
         alert("참가 신청이 완료되었습니다.");
         await fetchMeetings();
       } catch (error) {
@@ -539,12 +547,28 @@ const App: React.FC = () => {
     } catch (error) { console.error("사용자 정보 조회 실패:", error); } finally { setIsTargetLoading(false); }
   };
 
-  const handleBlockToggle = (id: string) => {
+  const handleBlockToggle = async (id: string) => {
+    const isBlocking = !blockedIds.has(id);
+    if (isBlocking) {
+      if (!window.confirm("이 사용자를 차단하시겠습니까? 차단 후에는 이 사용자의 콘텐츠가 더 이상 표시되지 않습니다.")) return;
+    } else {
+      if (!window.confirm("차단을 해제하시겠습니까?")) return;
+    }
+
     setBlockedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+
+    try {
+      const userRef = doc(db, "Users", currentUser.id);
+      await updateDoc(userRef, { 
+        blockedUsers: isBlocking ? arrayUnion(id) : arrayRemove(id) 
+      });
+    } catch (error) {
+      console.error("차단 목록 DB 업데이트 실패:", error);
+    }
   };
 
   const handleNicknameChange = async (newName: string) => { 
@@ -601,12 +625,44 @@ const App: React.FC = () => {
       setIsLoggedIn(false);
       setCurrentUser(initialUserState);
       setLikedExhibitionIds(new Set());
+      setBlockedIds(new Set());
       setCurrentView('list');
       setHistory([]);
       alert("로그아웃 되었습니다.");
     } catch (error) {
       console.error("Logout Error:", error);
       alert("로그아웃 중 오류가 발생했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleWithdrawalSubmit = async (reason: string) => {
+    setIsSaving(true);
+    setSavingMessage('탈퇴 신청을 처리 중입니다...');
+    try {
+      await addDoc(collection(db, "withdrawal_requests"), {
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        userName: currentUser.name,
+        reason,
+        createdAt: serverTimestamp()
+      });
+      
+      // 자동 로그아웃 처리
+      await signOut(auth);
+      localStorage.removeItem('exhibireg_user');
+      setIsLoggedIn(false);
+      setCurrentUser(initialUserState);
+      setLikedExhibitionIds(new Set());
+      setBlockedIds(new Set());
+      
+      alert('탈퇴 신청이 정상적으로 접수되었습니다. 그동안 서비스를 이용해 주셔서 감사합니다.');
+      setCurrentView('list');
+      setHistory([]);
+    } catch (error) {
+      console.error("Withdrawal Request Error:", error);
+      alert('처리 중 오류가 발생했습니다. 이메일로 문의 부탁드립니다.');
     } finally {
       setIsSaving(false);
     }
@@ -635,28 +691,38 @@ const App: React.FC = () => {
     navigateTo('meeting-edit');
   };
 
-  // handleReportUser function to fix compilation errors
   const handleReportUser = (userId: string, userName: string) => {
     setReportTarget({ id: userId, name: userName });
     setIsReportModalOpen(true);
   };
 
-  // handleReportSubmit function to fix compilation errors
   const handleReportSubmit = async (reason: ReportReason, description: string) => {
     if (!reportTarget) return;
     setIsSaving(true);
     setSavingMessage('신고를 접수하고 있습니다...');
     try {
+      const targetId = reportTarget.id;
       await addDoc(collection(db, "reports"), {
-        targetUserId: reportTarget.id,
+        targetUserId: targetId,
         reporterUserId: currentUser.id,
         reason,
         description,
         createdAt: serverTimestamp()
       });
-      alert('신고가 정상적으로 접수되었습니다. 운영팀에서 확인 후 조치하겠습니다.');
+      
       setIsReportModalOpen(false);
       setReportTarget(null);
+      
+      alert('신고가 정상적으로 접수되었습니다. 운영팀에서 확인 후 조치하겠습니다.');
+      
+      // UX 개선: 신고 후 차단 여부 묻기
+      if (!blockedIds.has(targetId)) {
+        setTimeout(() => {
+          if (window.confirm("이 사용자를 즉시 차단하시겠습니까? 차단 시 서로의 콘텐츠가 더 이상 표시되지 않습니다.")) {
+            handleBlockToggle(targetId);
+          }
+        }, 500);
+      }
     } catch (error) {
       console.error("Report Error:", error);
       alert('신고 접수 중 오류가 발생했습니다.');
@@ -813,7 +879,10 @@ const App: React.FC = () => {
             onDeleteMeeting={handleDeleteMeeting}
           />
         ) : currentView === 'chat' ? (
-          <ChatList rooms={chatRooms} meetings={meetings} onSelectRoom={(id) => { setSelectedMeetingId(id); navigateTo('chat-room'); }} onLeaveChat={handleLeaveChat} />
+          <ChatList rooms={chatRooms.filter(room => {
+            const meeting = meetings.find(m => m.id === room.id);
+            return !meeting || !blockedIds.has(meeting.creatorId);
+          })} meetings={meetings} onSelectRoom={(id) => { setSelectedMeetingId(id); navigateTo('chat-room'); }} onLeaveChat={handleLeaveChat} />
         ) : currentView === 'profile' ? (
           <ProfileView userId={currentUser.id} userName={currentUser.name} instagramUrl={currentUser.instagramUrl} bio={currentUser.bio} role={currentUser.role} isMe={true} myBlockedIds={blockedIds} likedExhibitionIds={likedExhibitionIds} meetings={meetings} tours={createdTours} allExhibitions={exhibitions} onBack={goBack} onBlockToggle={handleBlockToggle} onReport={handleReportUser} onSelectMeeting={handleMeetingSelect} onSelectTour={(tour) => {}} onSelectExhibition={handleExhibitionSelect} onSelectUser={handleUserClick} onGoSettings={() => navigateTo('settings')} onNicknameChange={handleNicknameChange} onInstagramUrlChange={handleInstagramUrlChange} onBioChange={handleBioChange} onRoleChange={handleRoleChange} />
         ) : currentView === 'user-profile' && selectedUserId ? (
@@ -828,11 +897,11 @@ const App: React.FC = () => {
           <SettingsView onBack={goBack} onNavigateBlocked={() => navigateTo('blocked-management')} onNavigateCustomerService={() => navigateTo('customer-service')} onWithdrawal={() => navigateTo('withdrawal-guide')} onLogout={handleLogout} userEmail={currentUser.email} />
         ) : currentView === 'blocked-management' ? (
           <BlockedManagementView blockedIds={blockedIds} onBack={goBack} onUnblock={handleBlockToggle} />
-        ) : currentView === 'withdrawal-guide' ? ( <WithdrawalGuideView onBack={goBack} />
+        ) : currentView === 'withdrawal-guide' ? ( <WithdrawalGuideView onBack={goBack} onWithdrawalSubmit={handleWithdrawalSubmit} />
         ) : currentView === 'report-guide' ? ( <ReportGuideView onBack={goBack} />
         ) : currentView === 'customer-service' ? ( <CustomerServiceView onBack={goBack} />
         ) : currentView === 'exhibition-meetings' && selectedExhibitionForMeetings ? (
-          <ExhibitionMeetingsView exhibitionId={selectedExhibitionForMeetings.id} exhibitionTitle={selectedExhibitionForMeetings.title} meetings={meetings} currentUserId={currentUser.id} onBack={goBack} onSelectMeeting={handleMeetingSelect} onCreateNew={() => { setMeetingContext({ id: selectedExhibitionForMeetings.id, title: selectedExhibitionForMeetings.title, type: 'exhibition', location: exhibitions.find(e => e.id === selectedExhibitionForMeetings.id)?.region || '' }); navigateTo('meeting-create'); }} onSelectUser={handleUserClick} />
+          <ExhibitionMeetingsView exhibitionId={selectedExhibitionForMeetings.id} exhibitionTitle={selectedExhibitionForMeetings.title} meetings={meetings} currentUserId={currentUser.id} blockedIds={blockedIds} onBack={goBack} onSelectMeeting={handleMeetingSelect} onCreateNew={() => { setMeetingContext({ id: selectedExhibitionForMeetings.id, title: selectedExhibitionForMeetings.title, type: 'exhibition', location: exhibitions.find(e => e.id === selectedExhibitionForMeetings.id)?.region || '' }); navigateTo('meeting-create'); }} onSelectUser={handleUserClick} />
         ) : currentView === 'meeting-create' && meetingContext ? (
           <MeetingCreate context={meetingContext} onBack={goBack} onCreated={(m) => { fetchMeetings(); setCurrentView('meeting'); setHistory([]); }} currentUserId={currentUser.id} />
         ) : currentView === 'meeting-edit' && editingMeetingId ? (

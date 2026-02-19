@@ -7,6 +7,7 @@ interface ExhibitionMeetingsViewProps {
   exhibitionTitle: string;
   meetings: Meeting[];
   currentUserId: string;
+  blockedIds: Set<string>;
   onBack: () => void;
   onSelectMeeting: (id: string) => void;
   onCreateNew: () => void;
@@ -17,6 +18,8 @@ const ExhibitionMeetingsView: React.FC<ExhibitionMeetingsViewProps> = ({
   exhibitionId,
   exhibitionTitle,
   meetings,
+  currentUserId,
+  blockedIds,
   onBack,
   onSelectMeeting,
   onCreateNew,
@@ -29,9 +32,13 @@ const ExhibitionMeetingsView: React.FC<ExhibitionMeetingsViewProps> = ({
 
   const openMeetings = useMemo(() => {
     return meetings
-      .filter(m => m.targetId === exhibitionId && !isMeetingPast(m.meetingDate, m.meetingTime))
+      .filter(m => 
+        m.targetId === exhibitionId && 
+        !isMeetingPast(m.meetingDate, m.meetingTime) &&
+        !blockedIds.has(m.creatorId) // 차단 필터링 추가
+      )
       .sort((a, b) => new Date(`${a.meetingDate}T${a.meetingTime}`).getTime() - new Date(`${b.meetingDate}T${b.meetingTime}`).getTime());
-  }, [meetings, exhibitionId]);
+  }, [meetings, exhibitionId, blockedIds]);
 
   const formatMeetingDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -62,7 +69,6 @@ const ExhibitionMeetingsView: React.FC<ExhibitionMeetingsViewProps> = ({
         <div className="space-y-8 pb-20">
           {openMeetings.length > 0 ? (
             openMeetings.map((m) => {
-              // participants는 호스트를 포함하고 있으므로 필터링 결과 개수가 곧 현재 참여 인원입니다.
               const acceptedCount = m.participants.filter(p => p.status === 'accepted').length;
               return (
                 <div 
